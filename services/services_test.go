@@ -124,9 +124,62 @@ func TestTimerServiceForwardsEvents(t *testing.T) {
 }
 
 func TestMusicServiceGenres(t *testing.T) {
+	settings, _, _, _ := newSettingsService(t)
 	c := catalog.Default()
-	if got := NewMusicService(c).Genres(); !reflect.DeepEqual(got, c) {
+	if got := NewMusicService(c, settings).Genres(); !reflect.DeepEqual(got, c) {
 		t.Fatalf("Genres() = %+v, want %+v", got, c)
+	}
+}
+
+func TestMusicServiceSelect(t *testing.T) {
+	settings, store, _, emit := newSettingsService(t)
+	svc := NewMusicService(catalog.Default(), settings)
+
+	if err := svc.Select("classical", 1); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ := store.Load()
+	if saved.Music.GenreID != "classical" || saved.Music.SourceIndex != 1 {
+		t.Fatalf("saved music = %+v", saved.Music)
+	}
+	if names := emit.names(); !reflect.DeepEqual(names, []string{EventSettingsChanged}) {
+		t.Fatalf("events = %v", names)
+	}
+
+	for _, tc := range []struct {
+		genre string
+		index int
+	}{{"nope", 0}, {"classical", 2}, {"classical", -1}} {
+		if err := svc.Select(tc.genre, tc.index); err == nil {
+			t.Errorf("Select(%q, %d) accepted", tc.genre, tc.index)
+		}
+	}
+	if got := settings.Get().Music; got.GenreID != "classical" || got.SourceIndex != 1 {
+		t.Fatalf("rejected Select changed settings: %+v", got)
+	}
+}
+
+func TestMusicServiceSaveVolume(t *testing.T) {
+	settings, store, _, _ := newSettingsService(t)
+	svc := NewMusicService(catalog.Default(), settings)
+	before := settings.Get()
+
+	if err := svc.SaveVolume(15, true); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ := store.Load()
+	if saved.Music.Volume != 15 || !saved.Music.Muted {
+		t.Fatalf("saved music = %+v", saved.Music)
+	}
+	// Only the volume fields change.
+	saved.Music.Volume, saved.Music.Muted = before.Music.Volume, before.Music.Muted
+	if !reflect.DeepEqual(saved, before) {
+		t.Fatalf("SaveVolume touched other settings: %+v", saved)
+	}
+
+	var ve *config.ValidationError
+	if err := svc.SaveVolume(101, false); !errors.As(err, &ve) {
+		t.Fatalf("SaveVolume(101) = %v, want ValidationError", err)
 	}
 }
 

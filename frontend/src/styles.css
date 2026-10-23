@@ -22,6 +22,7 @@
   --round-disabled: light-dark(rgba(20, 24, 40, 0.04), rgba(255, 255, 255, 0.05));
   --track: light-dark(rgba(20, 24, 40, 0.1), rgba(255, 255, 255, 0.14));
   --pill-neutral: light-dark(rgba(20, 24, 40, 0.06), rgba(255, 255, 255, 0.08));
+  --popover: light-dark(rgba(250, 250, 252, 0.98), rgba(36, 38, 50, 0.97));
   --pill-neutral-text: light-dark(#4e5363, #c4c8d4);
 
   --player-bg: #05060a;

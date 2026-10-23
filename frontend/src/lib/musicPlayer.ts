@@ -45,6 +45,8 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     /** The iframe exists (it is created on the first play, SPEC §3.4). */
     created: false,
     ready: false,
+    /** The user wants music (play/Start), even while it is still loading. */
+    wanted: false,
     playing: false,
     error: null as PlayerErrorKind | null,
     errorCode: null as number | null,
@@ -62,7 +64,6 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
   let host: HTMLElement | null = null
   let player: YTPlayer | null = null
   let creating = false
-  let wantPlaying = false
   let broken = new Set<number>() // sources of the current genre that failed this session
   let playlistErrors = 0
   let playlistConfigured = false
@@ -110,9 +111,9 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     state.title = src.title ?? ''
     if (src.type === SourceType.SourcePlaylist) {
       const opts = { list: src.id, listType: 'playlist' as const }
-      if (wantPlaying) player.loadPlaylist(opts)
+      if (state.wanted) player.loadPlaylist(opts)
       else player.cuePlaylist(opts)
-    } else if (wantPlaying) {
+    } else if (state.wanted) {
       player.loadVideoById(src.id)
     } else {
       player.cueVideoById(src.id)
@@ -170,7 +171,7 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     updateTrackInfo()
     // A single video or stream ended: continue with the next source. Playlists
     // loop by themselves (setLoop above).
-    if (s === YTState.Ended && source()?.type === SourceType.SourceVideo && wantPlaying) {
+    if (s === YTState.Ended && source()?.type === SourceType.SourceVideo && state.wanted) {
       const g = genre()
       const next = g ? nextPlayableSource(g, state.sourceIndex, broken) : null
       if (next !== null) {
@@ -196,7 +197,7 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
   }
 
   const onOffline = () => {
-    if (state.created || wantPlaying) setError('offline')
+    if (state.created || state.wanted) setError('offline')
   }
   const onOnline = () => {
     if (state.error === 'offline') retry()
@@ -222,27 +223,28 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
       state.genreId = g?.id ?? ''
       state.genreName = g?.name ?? ''
       state.sourceIndex = g ? clampSource(g, cfg.sourceIndex) : 0
+      state.title = source()?.title ?? ''
       state.volume = cfg.volume
       state.muted = cfg.muted
       state.configured = true
-      if (wantPlaying) void ensurePlayer()
+      if (state.wanted) void ensurePlayer()
     },
 
     /** The element the iframe goes into (PlayerPanel's container). */
     attach(el: HTMLElement) {
       host = el
-      if (wantPlaying) void ensurePlayer()
+      if (state.wanted) void ensurePlayer()
     },
 
     play() {
-      wantPlaying = true
+      state.wanted = true
       if (state.error === 'offline' || state.error === 'config') return retry()
       if (!player) return void ensurePlayer()
       if (state.ready && !state.error) player.playVideo()
     },
 
     pause() {
-      wantPlaying = false
+      state.wanted = false
       player?.pauseVideo()
     },
 
@@ -260,9 +262,17 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
       state.sourceIndex = 0
       broken = new Set()
       clearError()
+      state.title = source()?.title ?? ''
+      state.playlist = null
       if (player) loadCurrent()
-      else if (wantPlaying) void ensurePlayer()
+      else if (state.wanted) void ensurePlayer()
     },
+
+    /** The genre being played (reactive through state.genreId). */
+    currentGenre: () => genre(),
+
+    /** All genres of the catalog, for the genre list. */
+    genres: () => catalog.genres ?? [],
 
     nextGenre() {
       const g = nextGenre(catalog, state.genreId)

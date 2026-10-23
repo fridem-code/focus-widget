@@ -51,14 +51,15 @@ func New(assets fs.FS) (*application.App, error) {
 	// Services are created before the app they emit through; events only flow
 	// once the app runs, by which time emitter.app is set.
 	emitter := &appEmitter{}
+	settingsService := services.NewSettingsService(store, settings, t, emitter)
 	wailsApp := application.New(application.Options{
 		Name:        name,
 		Description: description,
 		Logger:      logger,
 		Services: []application.Service{
 			application.NewService(services.NewTimerService(t, emitter)),
-			application.NewService(services.NewSettingsService(store, settings, t, emitter)),
-			application.NewService(services.NewMusicService(genres)),
+			application.NewService(settingsService),
+			application.NewService(services.NewMusicService(genres, settingsService)),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

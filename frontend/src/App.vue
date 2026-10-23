@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { MusicService, SettingsService } from '../bindings/focuswidget/services'
+import MusicRow from './components/MusicRow.vue'
 import PlayerPanel from './components/PlayerPanel.vue'
 import TimerControls from './components/TimerControls.vue'
 import TimerView from './components/TimerView.vue'
 import TitleBar from './components/TitleBar.vue'
 import { useMusic } from './composables/useMusic'
 import { useTimer } from './composables/useTimer'
+import { persistMusic } from './lib/persistMusic'
 
 const { state, start, pause, resume, skip, resetPhase } = useTimer()
 const music = useMusic()
+const genreMenuOpen = ref(false)
+let stopPersist: (() => void) | undefined
 
 onMounted(async () => {
   const [catalog, settings] = await Promise.all([MusicService.Genres(), SettingsService.Get()])
@@ -21,8 +25,12 @@ onMounted(async () => {
     muted: settings.music.muted,
     shuffle: settings.music.shuffle,
   })
+  stopPersist = persistMusic(music, MusicService)
 })
-onUnmounted(() => music.dispose())
+onUnmounted(() => {
+  stopPersist?.()
+  music.dispose()
+})
 
 // play() runs synchronously inside the click handler, before the round trip
 // to Go (SPEC §5). The rest of the timer → music rules arrive with T8.
@@ -35,11 +43,10 @@ function onStart() {
 <template>
   <div class="widget" :data-phase="state?.phase ?? 'focus'">
     <TitleBar />
-    <!-- T7 replaces nextGenre with opening the genre list -->
-    <PlayerPanel :music="music" @choose-genre="music.nextGenre()" />
+    <PlayerPanel :music="music" @choose-genre="genreMenuOpen = true" />
     <template v-if="state">
       <TimerView :state="state" />
-      <!-- T7: music row goes here -->
+      <MusicRow v-if="music.state.configured" v-model:genre-open="genreMenuOpen" :music="music" />
       <TimerControls
         :state="state"
         @start="onStart"
@@ -53,8 +60,10 @@ function onStart() {
 </template>
 
 <style scoped>
-/* The glass fills the whole window: Windows draws the corners and shadow. */
+/* The glass fills the whole window: Windows draws the corners and shadow.
+   Positioned so the music popovers can place themselves against it. */
 .widget {
+  position: relative;
   height: 100%;
   padding: 12px;
   display: flex;
