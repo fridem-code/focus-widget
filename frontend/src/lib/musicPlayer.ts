@@ -57,6 +57,8 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     playlist: null as PlaylistPosition | null,
     volume: 50,
     muted: false,
+    /** Temporary lower volume on a break ("Тише"); never saved, `volume` stays the user's. */
+    duck: null as number | null,
   })
 
   let catalog: Catalog = { genres: [] }
@@ -131,7 +133,7 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
 
   function applyVolume() {
     if (!player) return
-    player.setVolume(state.volume)
+    player.setVolume(state.duck === null ? state.volume : Math.min(state.duck, state.volume))
     if (state.muted) player.mute()
     else player.unMute()
   }
@@ -286,6 +288,15 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
 
     setMuted(muted: boolean) {
       state.muted = muted
+      if (state.ready) applyVolume()
+    },
+
+    /**
+     * Plays at most `volume` until called with null, without touching the
+     * user's volume. Ducking never makes music louder than the user set it.
+     */
+    setDuck(volume: number | null) {
+      state.duck = volume === null ? null : Math.min(100, Math.max(0, Math.round(volume)))
       if (state.ready) applyVolume()
     },
 

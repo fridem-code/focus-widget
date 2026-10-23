@@ -86,6 +86,9 @@ describe('MusicRow', () => {
     current = wrapper
     await btn(wrapper, 'Включить музыку').trigger('click')
     expect(wrapper.find('button[aria-label="Пауза музыки"]').exists()).toBe(true)
+    await btn(wrapper, 'Пауза музыки').trigger('click')
+    await btn(wrapper, 'Включить музыку').trigger('click')
+    expect(wrapper.emitted('user')).toEqual([['play'], ['pause'], ['play']])
     await flush()
     handlers.onReady()
     await nextTick()

@@ -9,6 +9,8 @@ import VolumePopover from './VolumePopover.vue'
 const props = defineProps<{ music: MusicPlayer }>()
 /** Open state of the genre list; App opens it from the "no videos" card too. */
 const genreOpen = defineModel<boolean>('genreOpen', { default: false })
+/** A manual play/pause, so the timer policy can respect it (SPEC §3.3). */
+const emit = defineEmits<{ user: [action: 'play' | 'pause'] }>()
 const volumeOpen = ref(false)
 
 const s = props.music.state
@@ -48,8 +50,10 @@ function selectGenre(id: string) {
 }
 
 function togglePlay() {
-  if (wanted.value) props.music.pause()
+  const action = wanted.value ? 'pause' : 'play'
+  if (action === 'pause') props.music.pause()
   else props.music.play()
+  emit('user', action)
 }
 </script>
 

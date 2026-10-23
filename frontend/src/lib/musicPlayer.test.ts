@@ -179,6 +179,35 @@ describe('playback', () => {
   })
 })
 
+describe('ducking', () => {
+  it('lowers the player volume without changing the saved volume, and restores it', async () => {
+    const music = await started()
+    music.setDuck(20)
+    expect(fake.calls.at(-2)).toBe('volume 20')
+    expect(music.state.volume).toBe(40)
+
+    music.setVolume(60) // the user moves the slider during a ducked break
+    expect(fake.calls.at(-2)).toBe('volume 20')
+    music.setDuck(null)
+    expect(fake.calls.at(-2)).toBe('volume 60')
+  })
+
+  it('never raises the volume above the user setting', async () => {
+    const music = await started(config({ volume: 10 }))
+    music.setDuck(20)
+    expect(fake.calls.at(-2)).toBe('volume 10')
+  })
+
+  it('applies a duck set before the player is ready', async () => {
+    const music = setup()
+    music.setDuck(20)
+    music.play()
+    await flush()
+    handlers.onReady()
+    expect(fake.calls[0]).toBe('volume 20')
+  })
+})
+
 describe('errors', () => {
   it('skips a broken video and reports no_videos when the genre is exhausted', async () => {
     const music = await started()
