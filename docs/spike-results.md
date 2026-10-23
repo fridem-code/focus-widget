@@ -72,3 +72,46 @@
 - [ ] плеер играет по кнопкам Play / Live / Array playlist, громкость меняется слайдером
 
 Toast проверяется только в режиме `-selftest` (появляется примерно через 3 с после запуска).
+
+---
+
+# Спайк T0.5 — стекло на Acrylic
+
+Дата: 2026-10-23 · то же окружение (Wails v3.0.0-beta.34, WebView2 155, Windows 11 25H2, масштаб экрана 125%).
+
+Код: [spike/t05-acrylic](../spike/t05-acrylic). Как проверяли: `t05acrylic.exe -variant acrylic|transparent|solid` открывает виджет 380×540 (frameless, always-on-top, без ресайза) поверх второго окна-«обоев» с цветными пятнами и белым блоком текста, как на холсте. [capture.ps1](../spike/t05-acrylic/capture.ps1) снимает экран под виджетом, когда он в фокусе и когда фокус ушёл на «обои», а [state.mjs](../spike/t05-acrylic/state.mjs) читает состояние YouTube-плеера через DevTools-протокол. Скриншоты: [spike/t05-acrylic/shots](../spike/t05-acrylic/shots).
+
+## Итог
+
+**Берём Acrylic.** «Стекло» из макета получается системным эффектом Windows 11. Одно отличие от макета: **скругление углов окна делает Windows (около 8 px), 16 px из макета на Acrylic недостижимы.**
+
+Опции окна для T5/T9:
+```go
+application.WebviewWindowOptions{
+    Frameless:      true,
+    AlwaysOnTop:    settings.Window.AlwaysOnTop,
+    DisableResize:  true,
+    BackgroundType: application.BackgroundTypeTranslucent, // фон webview Wails делает прозрачным сам
+    Windows: application.WindowsWindow{
+        BackdropType: application.Acrylic, // Windows 11 22621+; на более старых Wails включает blur-behind
+    },
+}
+```
+CSS: `html, body { background: transparent }`, карточка на всё окно без `border-radius`, заливка `rgba(22,24,33,0.62)` и рамка `rgba(255,255,255,0.12)` (§3.8).
+
+## Ответы по пунктам
+
+| Пункт | Результат |
+|---|---|
+| Acrylic + прозрачный webview + CSS-заливка дают «стекло» | ✅ Пятна под виджетом размыты и затонированы, текст читается ([acrylic-focused.png](../spike/t05-acrylic/shots/acrylic-focused.png)) |
+| Frameless + скругление | ⚠️ Углы скругляет и тень рисует DWM (системные ~8 px). Свой `border-radius: 16px` даст светлые уголки: Acrylic заполняет всё прямоугольное окно |
+| Always-on-top | ✅ Виджет остаётся поверх, даже когда фокус у окна под ним |
+| `SetSize` 380×540 → 300×96 на лету | ✅ Стекло и углы перерисовываются ([acrylic-resized-focused.png](../spike/t05-acrylic/shots/acrylic-resized-focused.png)); компакт с самого старта тоже ок ([acrylic-compact-focused.png](../spike/t05-acrylic/shots/acrylic-compact-focused.png)) |
+| YouTube-iframe в прозрачном webview | ✅ Играет со звуком (state 1, время идёт) во всех трёх вариантах, артефактов нет |
+| Окно не в фокусе | ✅ Windows сама заменяет Acrylic сплошным тёмным фоном ([acrylic-unfocused.png](../spike/t05-acrylic/shots/acrylic-unfocused.png)) — ровно артборд «не в фокусе»; менять фон из CSS не нужно |
+| Выключенные эффекты прозрачности Windows / режим экономии | ⏳ Не проверено: это системная настройка, менять её я не стал. Ожидается тот же сплошной фон, что и без фокуса; проверить вручную в T13 |
+
+## Наблюдения для T5
+- **Тёмная тема поверх светлых окон** выглядит серой: Acrylic светлеет от белого фона, и заливки 0.62 не хватает (нижняя часть виджета на скриншоте). Варианты: поднять непрозрачность заливки до ~0.72–0.75 или следовать системной теме. Подобрать в T5 на живых окнах.
+- **Прозрачное окно** (`BackgroundTypeTransparent` + `DisableFramelessWindowDecorations`) даёт честные 16 px из CSS, но без размытия, без системной тени и без автоматического вида «не в фокусе» ([transparent-focused.png](../spike/t05-acrylic/shots/transparent-focused.png)). Оставляем как запасной вариант, если Acrylic где-то не заработает.
+- Wails требует `index.html` в FS ассетов, даже если окна открывают другие страницы.
