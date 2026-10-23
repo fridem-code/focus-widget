@@ -38,28 +38,36 @@ type Window interface {
 	SetBounds(application.Rect)
 	SetAlwaysOnTop(bool) application.Window
 	Show() application.Window
+	Hide() application.Window
+	Focus()
 	OnWindowEvent(events.WindowEventType, func(*application.WindowEvent)) func()
+	RegisterHook(events.WindowEventType, func(*application.WindowEvent)) func()
 }
 
 // WindowService switches between expanded and compact mode, toggles
-// always-on-top, and remembers and restores the window position.
+// always-on-top, hides to and shows from the tray, and remembers and
+// restores the window position.
 type WindowService struct {
 	settings *SettingsService
 	emit     Emitter
 	window   func() Window // the window is created after the services
 	screens  func() []*application.Screen
+	quit     func()
 
 	mu        sync.Mutex
 	saveTimer *time.Timer
+	visible   bool
+	quitting  bool
 }
 
 func NewWindowService(settings *SettingsService, emit Emitter, window func() Window,
-	screens func() []*application.Screen) *WindowService {
-	return &WindowService{settings: settings, emit: emit, window: window, screens: screens}
+	screens func() []*application.Screen, quit func()) *WindowService {
+	return &WindowService{settings: settings, emit: emit, window: window, screens: screens, quit: quit}
 }
 
-// ServiceStartup remembers the position after every move and, once the page
-// has loaded, puts the (hidden) window in place and shows it.
+// ServiceStartup remembers the position after every move, turns closing the
+// window into hiding it, and, once the page has loaded, puts the (hidden)
+// window in place and shows it.
 //
 // Wails creates native windows asynchronously, so ApplicationStarted can
 // arrive before the window exists and SetBounds/Show would silently do
@@ -68,14 +76,68 @@ func NewWindowService(settings *SettingsService, emit Emitter, window func() Win
 func (s *WindowService) ServiceStartup(context.Context, application.ServiceOptions) error {
 	win := s.window()
 	win.OnWindowEvent(events.Common.WindowDidMove, func(*application.WindowEvent) { s.moved() })
+	win.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
+		s.mu.Lock()
+		quitting := s.quitting
+		s.mu.Unlock()
+		if !quitting { // Alt+F4 and the like hide to the tray; only Quit exits (SPEC §3.4)
+			e.Cancel()
+			s.Hide()
+		}
+	})
 	var shown sync.Once
 	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
 		shown.Do(func() {
 			s.place()
-			win.Show()
+			s.Show()
 		})
 	})
 	return nil
+}
+
+// Visible reports whether the window is shown (not hidden in the tray).
+func (s *WindowService) Visible() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.visible
+}
+
+// Hide puts the window into the tray. window:visible=false goes out first so
+// the frontend pauses the music before the player disappears (SPEC §2).
+func (s *WindowService) Hide() {
+	s.setVisible(false)
+	s.window().Hide()
+}
+
+// Show brings the window back from the tray and focuses it.
+func (s *WindowService) Show() {
+	win := s.window()
+	win.Show()
+	win.Focus()
+	s.setVisible(true)
+}
+
+func (s *WindowService) ToggleVisible() {
+	if s.Visible() {
+		s.Hide()
+	} else {
+		s.Show()
+	}
+}
+
+// Quit exits the app; it is the only way out (closing just hides).
+func (s *WindowService) Quit() {
+	s.mu.Lock()
+	s.quitting = true
+	s.mu.Unlock()
+	s.quit()
+}
+
+func (s *WindowService) setVisible(v bool) {
+	s.mu.Lock()
+	s.visible = v
+	s.mu.Unlock()
+	s.emit.Emit(EventWindowVisible, v)
 }
 
 func (s *WindowService) ServiceShutdown() error {

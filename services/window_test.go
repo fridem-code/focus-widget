@@ -18,13 +18,40 @@ type fakeWindow struct {
 	bounds      application.Rect
 	alwaysOnTop bool
 	shown       bool
+	focused     int
+	quits       int
 	listeners   map[events.WindowEventType][]func(*application.WindowEvent)
+	hooks       map[events.WindowEventType][]func(*application.WindowEvent)
 }
 
 func (w *fakeWindow) fire(e events.WindowEventType) {
 	for _, fn := range w.listeners[e] {
 		fn(nil)
 	}
+}
+
+// hook runs the hooks for e and reports whether one of them cancelled it.
+func (w *fakeWindow) hook(e events.WindowEventType) (cancelled bool) {
+	ev := application.NewWindowEvent()
+	for _, fn := range w.hooks[e] {
+		fn(ev)
+	}
+	return ev.IsCancelled()
+}
+
+func (w *fakeWindow) Hide() application.Window {
+	w.shown = false
+	return nil
+}
+
+func (w *fakeWindow) Focus() { w.focused++ }
+
+func (w *fakeWindow) RegisterHook(e events.WindowEventType, fn func(*application.WindowEvent)) func() {
+	if w.hooks == nil {
+		w.hooks = map[events.WindowEventType][]func(*application.WindowEvent){}
+	}
+	w.hooks[e] = append(w.hooks[e], fn)
+	return func() {}
 }
 
 func (w *fakeWindow) Bounds() application.Rect {
@@ -62,8 +89,47 @@ func newWindowService(t *testing.T, screens ...*application.Screen) (*WindowServ
 	settings, _, _, emit := newSettingsService(t)
 	win := &fakeWindow{bounds: application.Rect{X: 100, Y: 50, Width: ExpandedWidth, Height: ExpandedHeight}}
 	svc := NewWindowService(settings, emit, func() Window { return win },
-		func() []*application.Screen { return screens })
+		func() []*application.Screen { return screens }, func() { win.quits++ })
 	return svc, win, settings, emit
+}
+
+func TestHideShowAnnounceVisibility(t *testing.T) {
+	svc, win, _, emit := newWindowService(t)
+	svc.Show()
+	if !win.shown || win.focused != 1 || !svc.Visible() {
+		t.Fatalf("after Show: shown=%v focused=%d visible=%v", win.shown, win.focused, svc.Visible())
+	}
+	svc.ToggleVisible()
+	if win.shown || svc.Visible() {
+		t.Fatal("ToggleVisible did not hide")
+	}
+	var vis []any
+	for _, e := range emit.take() {
+		if e.name == EventWindowVisible {
+			vis = append(vis, e.data)
+		}
+	}
+	if !reflect.DeepEqual(vis, []any{true, false}) {
+		t.Fatalf("window:visible events = %v", vis)
+	}
+}
+
+func TestClosingHidesUntilQuit(t *testing.T) {
+	svc, win, _, _ := newWindowService(t)
+	if err := svc.ServiceStartup(context.Background(), application.ServiceOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	svc.Show()
+	if cancelled := win.hook(events.Common.WindowClosing); !cancelled || win.shown {
+		t.Fatalf("close: cancelled=%v shown=%v, want hidden instead of closed", cancelled, win.shown)
+	}
+	svc.Quit()
+	if win.quits != 1 {
+		t.Fatal("Quit did not quit the app")
+	}
+	if cancelled := win.hook(events.Common.WindowClosing); cancelled {
+		t.Fatal("closing was blocked while quitting")
+	}
 }
 
 func TestWindowSize(t *testing.T) {

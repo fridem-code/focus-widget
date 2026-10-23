@@ -1,10 +1,16 @@
 // Dev-only handle for poking the app from the WebView2 devtools console:
 //   await __fw.TimerService.Start()
 //   __fw.music.nextTrack(); __fw.music.state
+//   __fw.Events.Emit('ui:command', 'compact')  // what the tray sends
 //   __fw.log  // events received so far
 import { Events } from '@wailsio/runtime'
 import * as AppEvents from '../bindings/events'
-import { MusicService, SettingsService, TimerService } from '../bindings/focuswidget/services'
+import {
+  MusicService,
+  SettingsService,
+  TimerService,
+  WindowService,
+} from '../bindings/focuswidget/services'
 import { useMusic } from './composables/useMusic'
 import type { MusicPlayer } from './lib/musicPlayer'
 
@@ -12,6 +18,8 @@ interface DebugHandle {
   TimerService: typeof TimerService
   SettingsService: typeof SettingsService
   MusicService: typeof MusicService
+  WindowService: typeof WindowService
+  Events: typeof Events
   music: MusicPlayer
   log: { name: string; data: unknown; at: number }[]
 }
@@ -27,10 +35,19 @@ export function installDebugHandle() {
     TimerService,
     SettingsService,
     MusicService,
+    WindowService,
+    Events,
     music: useMusic(),
     log: [],
   }
-  for (const name of [AppEvents.TimerTransition, AppEvents.TimerState, AppEvents.SettingsChanged]) {
+  for (const name of [
+    AppEvents.TimerTransition,
+    AppEvents.TimerState,
+    AppEvents.SettingsChanged,
+    AppEvents.WindowMode,
+    AppEvents.WindowVisible,
+    AppEvents.UiCommand,
+  ]) {
     Events.On(name, (ev) => handle.log.push({ name, data: ev.data, at: Date.now() }))
   }
   window.__fw = handle

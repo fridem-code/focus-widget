@@ -47,17 +47,25 @@ func New(assets fs.FS) (*application.App, error) {
 
 	// Services are created before the app they emit through; events only flow
 	// once the app runs, by which time emitter.app is set.
-	emitter := &appEmitter{}
+	// The tray follows every event too (it is attached below).
+	wails := &wailsEmitter{}
+	emitter := &services.TrayEmitter{Emitter: wails}
 	settingsService := services.NewSettingsService(store, settings, t, emitter)
 	var wailsApp *application.App
 	var mainWindow *application.WebviewWindow
 	windowService := services.NewWindowService(settingsService, emitter,
 		func() services.Window { return mainWindow },
-		func() []*application.Screen { return wailsApp.Screen.GetAll() })
+		func() []*application.Screen { return wailsApp.Screen.GetAll() },
+		func() { wailsApp.Quit() })
 	wailsApp = application.New(application.Options{
 		Name:        name,
 		Description: description,
 		Logger:      logger,
+		// A second launch exits and brings the running widget's window back (SPEC §3.9).
+		SingleInstance: &application.SingleInstanceOptions{
+			UniqueID:               "com.focuswidget.app",
+			OnSecondInstanceLaunch: func(application.SecondInstanceData) { windowService.Show() },
+		},
 		Services: []application.Service{
 			application.NewService(services.NewTimerService(t, emitter)),
 			application.NewService(settingsService),
@@ -72,11 +80,12 @@ func New(assets fs.FS) (*application.App, error) {
 			// not been clicked (tray "Start", phase auto-start). See docs/spike-results.md §3.
 			AdditionalBrowserArgs: append([]string{"--autoplay-policy=no-user-gesture-required"}, devBrowserArgs()...),
 		},
+		// A tray app: closing the window never ends it, only the tray's "Выход".
 		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: true,
+			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
 	})
-	emitter.app = wailsApp
+	wails.app = wailsApp
 
 	width, height := services.WindowSize(settings.Window.Mode)
 	mainWindow = wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
@@ -100,13 +109,18 @@ func New(assets fs.FS) (*application.App, error) {
 		URL: "/",
 	})
 
+	tray := services.NewTray(t, settingsService, windowService, emitter)
+	buildTray(wailsApp, tray)
+	emitter.Tray = tray
+
 	return wailsApp, nil
 }
 
-type appEmitter struct {
+// wailsEmitter sends events to the frontend.
+type wailsEmitter struct {
 	app *application.App
 }
 
-func (e *appEmitter) Emit(name string, data ...any) bool {
+func (e *wailsEmitter) Emit(name string, data ...any) bool {
 	return e.app.Event.Emit(name, data...)
 }

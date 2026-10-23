@@ -2,18 +2,18 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import TitleBar from './TitleBar.vue'
 
-const quit = vi.fn()
-vi.mock('@wailsio/runtime', () => ({ Application: { Quit: () => quit() } }))
+const hide = vi.fn()
+vi.mock('../../bindings/focuswidget/services', () => ({ WindowService: { Hide: () => hide() } }))
 
 describe('TitleBar', () => {
   it('shows the app name', () => {
     expect(mount(TitleBar).text()).toContain('Focus')
   })
 
-  it('quits the app on close', async () => {
+  it('hides to the tray instead of quitting', async () => {
     const wrapper = mount(TitleBar)
-    await wrapper.get('button[aria-label="Закрыть"]').trigger('click')
-    expect(quit).toHaveBeenCalledOnce()
+    await wrapper.get('button[aria-label="Скрыть в трей"]').trigger('click')
+    expect(hide).toHaveBeenCalledOnce()
   })
 
   it('keeps settings disabled until they are implemented', () => {

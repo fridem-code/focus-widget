@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { Events } from '@wailsio/runtime'
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
-import { WindowMode as WindowModeEvent } from '../bindings/events'
+import {
+  UiCommand,
+  WindowMode as WindowModeEvent,
+  WindowVisible as WindowVisibleEvent,
+} from '../bindings/events'
 import { WindowMode } from '../bindings/focuswidget/internal/config/models'
 import { Phase } from '../bindings/focuswidget/internal/timer/models'
 import { MusicService, SettingsService, WindowService } from '../bindings/focuswidget/services'
@@ -26,8 +30,11 @@ const genreMenuOpen = ref(false)
 const ready = ref(false)
 const windowMode = shallowRef<WindowModeController>()
 const compact = computed(() => windowMode.value?.mode.value === 'compact')
+/** False while hidden in the tray. */
+const visible = ref(true)
 let policy: MusicPolicyRunner | undefined
 let stopPersist: (() => void) | undefined
+const offEvents: (() => void)[] = []
 
 onMounted(async () => {
   const [catalog, settings] = await Promise.all([MusicService.Genres(), SettingsService.Get()])
@@ -51,13 +58,33 @@ onMounted(async () => {
         cb(ev.data === WindowMode.WindowCompact ? 'compact' : 'expanded'),
       ),
     beforeCompact: () => state.value && runner.mode('compact', state.value),
-    afterExpand: () => state.value && runner.mode('expanded', state.value),
+    // Growing while hidden in the tray must not start the (invisible) player.
+    afterExpand: () => visible.value && state.value && runner.mode('expanded', state.value),
   })
+  const wm = windowMode.value
+
+  // Hidden in the tray the player is not visible, which for YouTube is the
+  // same as compact mode: music waits until the window is back (SPEC §2, §3.4).
+  offEvents.push(
+    Events.On(WindowVisibleEvent, (ev) => {
+      visible.value = ev.data
+      if (!state.value) return
+      runner.mode(ev.data ? wm.mode.value : 'compact', state.value)
+    }),
+    // Tray commands the frontend carries out: it owns the player and the
+    // order of pausing and resizing.
+    Events.On(UiCommand, (ev) => {
+      if (ev.data === 'compact') void wm.compact()
+      else if (ev.data === 'expand') void wm.expand()
+      else if (ev.data === 'next-genre') music.nextGenre()
+    }),
+  )
   // Rendered only now, so a window saved in compact mode never shows the
   // expanded layout first.
   ready.value = true
 })
 onUnmounted(() => {
+  offEvents.forEach((off) => off())
   windowMode.value?.stop()
   policy?.stop()
   stopPersist?.()
@@ -69,7 +96,7 @@ onUnmounted(() => {
 // A break may want silence and compact mode always does, so those are left to
 // the policy.
 function onStart() {
-  if (!compact.value && state.value?.phase === Phase.Focus) music.play()
+  if (visible.value && !compact.value && state.value?.phase === Phase.Focus) music.play()
   void start()
 }
 </script>

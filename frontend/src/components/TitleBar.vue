@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { Application } from '@wailsio/runtime'
+import { WindowService } from '../../bindings/focuswidget/services'
 
 const emit = defineEmits<{ compact: [] }>()
 
-// Settings (T12) are not wired yet, so its button is disabled. T10 turns
-// close into hide-to-tray; until then it quits.
-function close() {
-  void Application.Quit()
+// Settings (T12) are not wired yet, so its button is disabled. The cross
+// hides to the tray; only the tray's "Выход" quits (SPEC §3.4).
+function hide() {
+  void WindowService.Hide()
 }
 </script>
 
@@ -51,7 +51,7 @@ function close() {
           <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />
         </svg>
       </button>
-      <button class="icon-button" type="button" aria-label="Закрыть" @click="close">
+      <button class="icon-button" type="button" aria-label="Скрыть в трей" @click="hide">
         <svg
           aria-hidden="true"
           width="18"

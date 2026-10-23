@@ -15,6 +15,18 @@ const (
 	EventTimerTransition = "timer:transition"
 	EventSettingsChanged = "settings:changed"
 	EventWindowMode      = "window:mode"
+	EventWindowVisible   = "window:visible"
+	// EventUICommand asks the frontend to do something it owns: "compact",
+	// "expand" (it sequences music and resizing) or "next-genre" (the player
+	// lives there). Sent by the tray.
+	EventUICommand = "ui:command"
+)
+
+// UI commands carried by EventUICommand.
+const (
+	UICompact   = "compact"
+	UIExpand    = "expand"
+	UINextGenre = "next-genre"
 )
 
 func init() {
@@ -24,6 +36,8 @@ func init() {
 	application.RegisterEvent[timer.Transition](EventTimerTransition)
 	application.RegisterEvent[config.Settings](EventSettingsChanged)
 	application.RegisterEvent[config.WindowMode](EventWindowMode)
+	application.RegisterEvent[bool](EventWindowVisible)
+	application.RegisterEvent[string](EventUICommand)
 }
 
 // Emitter publishes an event to the frontend; *application.EventManager
