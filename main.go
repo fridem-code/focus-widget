@@ -13,7 +13,11 @@ import (
 var assets embed.FS
 
 func main() {
-	if err := app.New(assets).Run(); err != nil {
+	wailsApp, err := app.New(assets)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := wailsApp.Run(); err != nil {
 		log.Fatal(err)
 	}
 }

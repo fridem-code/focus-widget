@@ -54,7 +54,7 @@ T2/T3 и T6 можно делать параллельно.
 
 **Готово, когда:** table-driven тесты на все переходы, выбор длинного перерыва, автостарты, Skip/Reset, сон; `go test -race` зелёный.
 
-### T4. `TimerService`, `SettingsService` + события · ~0.5 дня
+### T4. `TimerService`, `SettingsService` + события · ✅ сделан 2026-10-23 (проверено в запущенном приложении через CDP; `SettingsService.modify` — точка расширения для T7/T9)
 - [ ] Wails-сервисы поверх T2/T3, генерация TS-bindings
 - [ ] События `timer:state`, `timer:transition`, `settings:changed` (§5.2)
 - [ ] `SettingsService.Update` валидирует, сохраняет и применяет длительности к таймеру (правило из §5.1)

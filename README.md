@@ -33,6 +33,16 @@ Go + [Wails v3](https://v3.wails.io) (WebView2), интерфейс на Vue 3 +
 
 `test` и `lint` сначала собирают фронтенд: Go встраивает `frontend/dist` через `go:embed`, а vue-tsc нужны сгенерированные биндинги.
 
+## Отладка
+
+В dev-сборках (`wails3 task dev`, `wails3 build DEV=true`):
+- в консоли DevTools (F12) доступен `window.__fw`: `await __fw.TimerService.Start()`, `await __fw.SettingsService.Get()`, а в `__fw.log` копятся полученные события;
+- `FOCUSWIDGET_DEVTOOLS_PORT=9333` открывает порт протокола DevTools WebView2, чтобы скрипты могли управлять страницей (`http://127.0.0.1:9333/json`).
+
+В production-сборку ни то ни другое не попадает.
+
+Настройки лежат в `%APPDATA%\FocusWidget\config.json`.
+
 ## Структура
 
 ```
