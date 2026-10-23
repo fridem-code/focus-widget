@@ -107,6 +107,15 @@ func TestTimerServiceForwardsEvents(t *testing.T) {
 	if st := svc.State(); st.Phase != timer.ShortBreak || st.Status != timer.Idle {
 		t.Fatalf("after Skip: %+v", st)
 	}
+	_ = svc.Start()
+	emit.take()
+	svc.ResetPhase()
+	if st := svc.State(); st.Phase != timer.ShortBreak || st.Status != timer.Idle {
+		t.Fatalf("after ResetPhase: %+v", st)
+	}
+	if ev := emit.take(); len(ev) != 2 || ev[0].data.(timer.Transition).Cause != timer.CauseResetPhase {
+		t.Fatalf("ResetPhase events = %+v", ev)
+	}
 	svc.Reset()
 	if st := svc.State(); st.Phase != timer.Focus || st.Status != timer.Idle {
 		t.Fatalf("after Reset: %+v", st)

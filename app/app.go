@@ -71,15 +71,21 @@ func New(assets fs.FS) (*application.App, error) {
 	emitter.app = wailsApp
 
 	wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:             "main",
-		Title:            name,
-		Width:            expandedWidth,
-		Height:           expandedHeight,
-		Frameless:        true,
-		AlwaysOnTop:      settings.Window.AlwaysOnTop,
-		DisableResize:    true,
-		BackgroundColour: application.NewRGB(18, 18, 24),
-		URL:              "/",
+		Name:          "main",
+		Title:         name,
+		Width:         expandedWidth,
+		Height:        expandedHeight,
+		Frameless:     true,
+		AlwaysOnTop:   settings.Window.AlwaysOnTop,
+		DisableResize: true,
+		// Glass: system Acrylic behind a transparent webview, tinted by CSS. Windows
+		// draws the corners and shadow and swaps Acrylic for a solid fill while the
+		// window is inactive (docs/spike-results.md, T0.5).
+		BackgroundType: application.BackgroundTypeTranslucent,
+		Windows: application.WindowsWindow{
+			BackdropType: application.Acrylic,
+		},
+		URL: "/",
 	})
 
 	return wailsApp, nil

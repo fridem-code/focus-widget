@@ -52,7 +52,11 @@ func (s *TimerService) Resume() error { return s.timer.Resume() }
 // Skip ends the current phase without counting it and moves to the next one.
 func (s *TimerService) Skip() { s.timer.Skip() }
 
-// Reset returns to an idle focus phase and starts a new cycle.
+// ResetPhase puts the current phase back to its full length, idle; the
+// session count is kept («Сбросить фазу»).
+func (s *TimerService) ResetPhase() { s.timer.ResetPhase() }
+
+// Reset returns to an idle focus phase and starts a new cycle («Сбросить цикл»).
 func (s *TimerService) Reset() { s.timer.Reset() }
 
 // TimerConfig converts the persisted timer settings into the timer's config.

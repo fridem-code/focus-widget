@@ -1,47 +1,41 @@
 <script setup lang="ts">
+import PlayerPlaceholder from './components/PlayerPlaceholder.vue'
+import TimerControls from './components/TimerControls.vue'
+import TimerView from './components/TimerView.vue'
 import TitleBar from './components/TitleBar.vue'
+import { useTimer } from './composables/useTimer'
+
+const { state, start, pause, resume, skip, resetPhase } = useTimer()
 </script>
 
 <template>
-  <div class="widget">
-    <TitleBar title="Focus Widget" />
-    <main class="content">
-      <!-- Placeholders until T5 (timer) and T6 (player). Player viewport must stay ≥200×200 (SPEC §2). -->
-      <div class="player-slot">YouTube-плеер · 356×200</div>
-      <div class="timer">25:00</div>
-    </main>
+  <div class="widget" :data-phase="state?.phase ?? 'focus'">
+    <TitleBar />
+    <PlayerPlaceholder />
+    <template v-if="state">
+      <TimerView :state="state" />
+      <!-- T7: music row goes here -->
+      <TimerControls
+        :state="state"
+        @start="start"
+        @pause="pause"
+        @resume="resume"
+        @skip="skip"
+        @reset-phase="resetPhase"
+      />
+    </template>
   </div>
 </template>
 
 <style scoped>
+/* The glass fills the whole window: Windows draws the corners and shadow. */
 .widget {
-  display: flex;
-  flex-direction: column;
   height: 100%;
-}
-
-.content {
-  flex: 1;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 12px;
-}
-
-.player-slot {
-  width: 356px;
-  height: 200px;
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-  background: var(--surface);
-  border-radius: var(--radius);
-}
-
-.timer {
-  font-size: 48px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  gap: 10px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
 }
 </style>

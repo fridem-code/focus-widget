@@ -246,6 +246,44 @@ func TestReset(t *testing.T) {
 	}
 }
 
+func TestResetPhase(t *testing.T) {
+	t.Run("running break restarts idle and keeps the cycle", func(t *testing.T) {
+		h := newHarness(t, testConfig())
+		h.m.completedFocus = 1
+		h.must(h.m.start(h.now))
+		h.finish() // focus done -> short break running, completed 2
+		h.advance(3 * time.Minute)
+
+		tr := h.m.resetPhase(h.now)
+		if tr.Cause != CauseResetPhase || tr.From.Status != Running || tr.To.Phase != ShortBreak {
+			t.Fatalf("resetPhase transition = %+v", tr)
+		}
+		h.want(ShortBreak, Idle, 5*time.Minute, 2)
+		if _, ok := h.m.tick(h.now.Add(time.Hour)); ok {
+			t.Fatal("idle timer expired after resetPhase")
+		}
+	})
+
+	t.Run("paused focus", func(t *testing.T) {
+		h := newHarness(t, testConfig())
+		h.must(h.m.start(h.now))
+		h.advance(10 * time.Minute)
+		h.must(h.m.pause(h.now))
+		h.m.resetPhase(h.now)
+		h.want(Focus, Idle, 25*time.Minute, 0)
+	})
+
+	t.Run("uses the current config length", func(t *testing.T) {
+		h := newHarness(t, testConfig())
+		h.must(h.m.start(h.now))
+		cfg := testConfig()
+		cfg.Focus = 40 * time.Minute
+		h.m.setConfig(cfg) // running phase keeps 25m until reset
+		h.m.resetPhase(h.now)
+		h.want(Focus, Idle, 40*time.Minute, 0)
+	})
+}
+
 func TestSleepOvershootExpiresOnce(t *testing.T) {
 	cfg := testConfig()
 	cfg.AutoStartFocus = true

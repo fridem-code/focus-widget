@@ -7,6 +7,8 @@ node_modules
 build/linux/appimage/build
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 
+scripts/ui-check/out
+
 # Spike T0 build outputs
 spike/**/frontend/dist
 spike/**/frontend/bindings

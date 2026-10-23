@@ -34,7 +34,9 @@ const (
 	CauseResume Cause = "resume"
 	CauseExpire Cause = "expire"
 	CauseSkip   Cause = "skip"
-	CauseReset  Cause = "reset"
+	// CauseResetPhase restarts the current phase; CauseReset restarts the whole cycle.
+	CauseResetPhase Cause = "reset_phase"
+	CauseReset      Cause = "reset"
 )
 
 // ErrInvalidCommand is returned for a command the current status does not
@@ -157,6 +159,14 @@ func (m *machine) skip(now time.Time) Transition {
 	return tr
 }
 
+// resetPhase puts the current phase back to its full length, idle, keeping the
+// cycle's progress. The length comes from the current config.
+func (m *machine) resetPhase(now time.Time) Transition {
+	tr, _ := m.do(now, CauseResetPhase, nil, func() { m.enter(m.phase) })
+	return tr
+}
+
+// reset starts a new cycle: an idle focus phase with no completed sessions.
 func (m *machine) reset(now time.Time) Transition {
 	tr, _ := m.do(now, CauseReset, nil, func() {
 		m.completedFocus = 0

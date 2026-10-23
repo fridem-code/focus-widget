@@ -83,6 +83,10 @@ func (t *Timer) Skip() {
 	_ = t.command(func(now time.Time) (Transition, error) { return t.m.skip(now), nil })
 }
 
+func (t *Timer) ResetPhase() {
+	_ = t.command(func(now time.Time) (Transition, error) { return t.m.resetPhase(now), nil })
+}
+
 func (t *Timer) Reset() {
 	_ = t.command(func(now time.Time) (Transition, error) { return t.m.reset(now), nil })
 }

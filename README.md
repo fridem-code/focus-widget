@@ -41,6 +41,8 @@ Go + [Wails v3](https://v3.wails.io) (WebView2), интерфейс на Vue 3 +
 
 В production-сборку ни то ни другое не попадает.
 
+Скриптовая проверка интерфейса: `powershell -File scripts/ui-check/run.ps1` после `wails3 build DEV=true`. Скрипт кладёт виджет поверх тестового окна с цветным фоном, прокликивает состояния таймера и печатает DOM каждого шага, а скриншоты сохраняет в `scripts/ui-check/out`. Подробности — в шапке `run.ps1`.
+
 Настройки лежат в `%APPDATA%\FocusWidget\config.json`.
 
 ## Структура

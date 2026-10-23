@@ -27,6 +27,7 @@ func main() {
 	compact := flag.Bool("compact", false, "start the widget at the compact size")
 	blurAfter := flag.Int("blurafter", 0, "seconds after start to focus the wallpaper window (0: never)")
 	resizeAfter := flag.Int("resizeafter", 0, "seconds after start to shrink the widget to 300x96 at runtime (0: never)")
+	wallOnly := flag.Bool("wallonly", false, "open only the wallpaper window (backdrop for checking the real app)")
 	flag.Parse()
 
 	assets, err := fs.Sub(www, "www")
@@ -53,6 +54,13 @@ func main() {
 		BackgroundColour: application.NewRGB(12, 17, 40),
 		URL:              "/wall.html",
 	})
+
+	if *wallOnly {
+		if err := app.Run(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 
 	opts := application.WebviewWindowOptions{
 		Title:         "t05 widget",
