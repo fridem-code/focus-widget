@@ -17,6 +17,7 @@ import TimerView from './components/TimerView.vue'
 import TitleBar from './components/TitleBar.vue'
 import { useMusic } from './composables/useMusic'
 import { connectMusicPolicy } from './composables/useMusicPolicy'
+import { connectPhaseSound } from './composables/usePhaseSound'
 import { useTimer } from './composables/useTimer'
 import { useWindowActive } from './composables/useWindowActive'
 import { persistMusic } from './lib/persistMusic'
@@ -47,6 +48,7 @@ onMounted(async () => {
     shuffle: settings.music.shuffle,
   })
   stopPersist = persistMusic(music, MusicService)
+  offEvents.push(connectPhaseSound(settings))
   const runner = connectMusicPolicy(music, settings)
   policy = runner
   windowMode.value = createWindowMode({

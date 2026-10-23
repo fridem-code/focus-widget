@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 
 	"focuswidget/internal/catalog"
 	"focuswidget/internal/config"
@@ -53,6 +54,9 @@ func New(assets fs.FS) (*application.App, error) {
 	settingsService := services.NewSettingsService(store, settings, t, emitter)
 	var wailsApp *application.App
 	var mainWindow *application.WebviewWindow
+	// Registers the app with Windows (HKCU AppUserModelId + COM activator) on
+	// startup; T13's uninstaller removes those keys (docs/spike-results.md §6).
+	toasts := notifications.New()
 	windowService := services.NewWindowService(settingsService, emitter,
 		func() services.Window { return mainWindow },
 		func() []*application.Screen { return wailsApp.Screen.GetAll() },
@@ -71,6 +75,7 @@ func New(assets fs.FS) (*application.App, error) {
 			application.NewService(settingsService),
 			application.NewService(services.NewMusicService(genres, settingsService)),
 			application.NewService(windowService),
+			application.NewService(toasts),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -112,6 +117,13 @@ func New(assets fs.FS) (*application.App, error) {
 	tray := services.NewTray(t, settingsService, windowService, emitter)
 	buildTray(wailsApp, tray)
 	emitter.Tray = tray
+
+	// Toast when a phase runs out (the chime is the frontend's); clicking the
+	// toast brings the window back.
+	services.NewPhaseNotifier(t, toasts, settingsService, func(err error) {
+		logger.Warn("phase-end toast failed", "err", err)
+	})
+	toasts.OnNotificationResponse(func(notifications.NotificationResult) { windowService.Show() })
 
 	return wailsApp, nil
 }

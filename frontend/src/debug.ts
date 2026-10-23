@@ -12,6 +12,8 @@ import {
   WindowService,
 } from '../bindings/focuswidget/services'
 import { useMusic } from './composables/useMusic'
+import { useChime } from './composables/usePhaseSound'
+import type { Chime } from './lib/chime'
 import type { MusicPlayer } from './lib/musicPlayer'
 
 interface DebugHandle {
@@ -21,6 +23,7 @@ interface DebugHandle {
   WindowService: typeof WindowService
   Events: typeof Events
   music: MusicPlayer
+  chime: Chime
   log: { name: string; data: unknown; at: number }[]
 }
 
@@ -38,6 +41,7 @@ export function installDebugHandle() {
     WindowService,
     Events,
     music: useMusic(),
+    chime: useChime(),
     log: [],
   }
   for (const name of [
