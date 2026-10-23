@@ -134,10 +134,13 @@ running --Expire--> next(phase); status = running, если autoStart для с�
 any     --Skip-->   next(phase), status = idle (CompletedFocus не увеличивается)
 any     --Reset-->  focus, idle, CompletedFocus = 0
 
-next(focus)  = long_break, если (CompletedFocus+1) % LongBreakEvery == 0, иначе short_break
-next(break)  = focus
-Expire фокуса увеличивает CompletedFocus; после long_break счётчик обнуляется.
+Expire фокуса увеличивает CompletedFocus.
+next(focus)  = long_break, если фокус завершён (Expire) и CompletedFocus >= LongBreakEvery, иначе short_break
+               (пропущенный фокус не засчитывается: после Skip всегда short_break)
+next(break)  = focus; выход из long_break (Expire или Skip) обнуляет CompletedFocus
 ```
+
+Сколько бы дедлайн ни был просрочен (сон ПК), тик даёт **ровно один** Expire. Автостартованная следующая фаза получает полную длительность, отсчитанную от момента пробуждения. Дедлайны сравниваются по настенным часам (`time.Now().Round(0)`), поэтому время сна всегда засчитывается.
 
 Изменение длительностей в настройках применяется к фазам в состоянии `idle` сразу, к идущей фазе — со следующей.
 

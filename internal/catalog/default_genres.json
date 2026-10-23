@@ -1,0 +1,15 @@
+{
+  "genres": [
+    {
+      "id": "lofi",
+      "name": "Lo-fi",
+      "sources": [
+        {
+          "type": "video",
+          "id": "CFGLoQIhmow",
+          "title": "lofi hip hop mix — beats to relax/study to (Part 1)"
+        }
+      ]
+    }
+  ]
+}
