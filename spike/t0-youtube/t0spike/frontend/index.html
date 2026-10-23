@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>t0spike</title>
+    <style>
+        body { margin: 0; background: #121218; color: #ddd; font: 12px/1.4 system-ui, sans-serif; }
+        .bar { --wails-draggable: drag; height: 28px; display: flex; align-items: center; padding: 0 12px; background: #1d1d26; font-weight: 600; }
+        #player { display: block; margin: 8px auto; }
+        .controls { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px; }
+        button { background: #2b2b38; color: #eee; border: 0; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+        input[type=range] { width: 100px; }
+        pre { margin: 8px 12px; height: 210px; overflow: auto; background: #0b0b10; padding: 6px; font-size: 10px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+<div class="bar" id="title">t0spike</div>
+<div id="player"></div>
+<div class="controls">
+    <button id="play">Play</button>
+    <button id="pause">Pause</button>
+    <button id="next">Next</button>
+    <button id="live">Live</button>
+    <button id="list">Array playlist</button>
+    <input id="volume" type="range" min="0" max="100" value="50"/>
+</div>
+<pre id="log"></pre>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

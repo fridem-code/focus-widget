@@ -1,0 +1,512 @@
+{
+  "started": "2026-10-23T18:48:22.8966761+04:00",
+  "browserArgs": null,
+  "go": {
+    "finishedAllPages": true,
+    "singleInstance.callbackArgs": [
+      "C:\\Users\\ilya.logvinenko\\Documents\\Code\\Projects\\go_widget_timer\\spike\\t0-youtube\\t0spike\\bin\\t0spike.exe",
+      "-second-instance-probe"
+    ],
+    "singleInstance.secondExitError": "",
+    "singleInstance.secondExitedAfterMs": 55,
+    "toast.sendError": "",
+    "window.initialSize": [
+      380,
+      540
+    ],
+    "window.positionAfterSet": [
+      200,
+      150
+    ],
+    "window.sizeAfterCompact": [
+      300,
+      96
+    ],
+    "window.sizeAfterExpand": [
+      380,
+      540
+    ],
+    "window.topmostAfterOff": false,
+    "window.topmostAfterOn": true,
+    "window.topmostAtStart": true
+  },
+  "pages": {
+    "localhttp": [
+      {
+        "key": "ready",
+        "t": 1316,
+        "value": {
+          "isLive": false,
+          "muted": false,
+          "playlistIndex": -1,
+          "state": -1,
+          "time": 0,
+          "videoId": "jfKfPfyJRdk",
+          "volume": 100
+        },
+        "variant": "localhttp"
+      },
+      {
+        "key": "env",
+        "t": 1326,
+        "value": {
+          "hasBeenActive": false,
+          "href": "http://127.0.0.1:56662/?variant=localhttp\u0026port=56662\u0026selftest=true",
+          "origin": "http://127.0.0.1:56662",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+        },
+        "variant": "localhttp"
+      },
+      {
+        "key": "error",
+        "t": 1328,
+        "value": 150,
+        "variant": "localhttp"
+      },
+      {
+        "key": "liveUnmutedNoGesture",
+        "t": 16492,
+        "value": {
+          "isLive": false,
+          "muted": false,
+          "ok": false,
+          "playlistIndex": -1,
+          "state": -1,
+          "time": 0,
+          "videoId": "jfKfPfyJRdk",
+          "volume": 100
+        },
+        "variant": "localhttp"
+      },
+      {
+        "key": "liveMutedNoGesture",
+        "t": 31609,
+        "value": {
+          "isLive": false,
+          "muted": true,
+          "ok": false,
+          "playlistIndex": -1,
+          "state": -1,
+          "time": 0,
+          "videoId": "jfKfPfyJRdk",
+          "volume": 100
+        },
+        "variant": "localhttp"
+      },
+      {
+        "key": "unmuteAfterMutedPlay",
+        "t": 33122,
+        "value": {
+          "isLive": false,
+          "muted": false,
+          "playlistIndex": -1,
+          "state": -1,
+          "time": 0,
+          "videoId": "jfKfPfyJRdk",
+          "volume": 100
+        },
+        "variant": "localhttp"
+      },
+      {
+        "key": "setVolume30",
+        "t": 33637,
+        "value": {
+          "ok": true,
+          "volume": 30
+        },
+        "variant": "localhttp"
+      },
+      {
+        "key": "pause",
+        "t": 35143,
+        "value": {
+          "isLive": false,
+          "muted": false,
+          "ok": false,
+          "playlistIndex": -1,
+          "state": -1,
+          "time": 0,
+          "videoId": "jfKfPfyJRdk",
+          "volume": 30
+        },
+        "variant": "localhttp"
+      },
+      {
+        "key": "state",
+        "t": 35929,
+        "value": 3,
+        "variant": "localhttp"
+      },
+      {
+        "key": "state",
+        "t": 36601,
+        "value": 1,
+        "variant": "localhttp"
+      },
+      {
+        "key": "state",
+        "t": 37187,
+        "value": 2,
+        "variant": "localhttp"
+      },
+      {
+        "key": "state",
+        "t": 37194,
+        "value": -1,
+        "variant": "localhttp"
+      },
+      {
+        "key": "state",
+        "t": 37208,
+        "value": 3,
+        "variant": "localhttp"
+      },
+      {
+        "key": "error",
+        "t": 37346,
+        "value": 150,
+        "variant": "localhttp"
+      },
+      {
+        "key": "state",
+        "t": 37348,
+        "value": -1,
+        "variant": "localhttp"
+      },
+      {
+        "key": "arrayPlaylistNext",
+        "t": 41161,
+        "value": {
+          "after": {
+            "isLive": false,
+            "muted": false,
+            "playlistIndex": 1,
+            "state": -1,
+            "time": 0,
+            "videoId": "dQw4w9WgXcQ",
+            "volume": 30
+          },
+          "before": {
+            "isLive": false,
+            "muted": false,
+            "playlistIndex": 0,
+            "state": 1,
+            "time": 0.6,
+            "videoId": "M7lc1UVf-VE",
+            "volume": 30
+          },
+          "ok": true
+        },
+        "variant": "localhttp"
+      },
+      {
+        "key": "setShuffle",
+        "t": 41162,
+        "value": {
+          "ok": true
+        },
+        "variant": "localhttp"
+      },
+      {
+        "key": "state",
+        "t": 41189,
+        "value": 3,
+        "variant": "localhttp"
+      },
+      {
+        "key": "error",
+        "t": 41313,
+        "value": 150,
+        "variant": "localhttp"
+      },
+      {
+        "key": "state",
+        "t": 41315,
+        "value": -1,
+        "variant": "localhttp"
+      },
+      {
+        "key": "invalidVideo",
+        "t": 49170,
+        "value": {
+          "errors": [
+            {
+              "code": 150,
+              "videoId": "invalid0000"
+            }
+          ],
+          "gotError": true
+        },
+        "variant": "localhttp"
+      },
+      {
+        "key": "allErrors",
+        "t": 49171,
+        "value": [
+          {
+            "code": 150,
+            "videoId": "jfKfPfyJRdk"
+          },
+          {
+            "code": 150
+          },
+          {
+            "code": 150,
+            "videoId": "invalid0000"
+          }
+        ],
+        "variant": "localhttp"
+      },
+      {
+        "key": "done",
+        "t": 49172,
+        "value": true,
+        "variant": "localhttp"
+      }
+    ],
+    "wails": [
+      {
+        "key": "ready",
+        "t": 1202,
+        "value": {
+          "isLive": false,
+          "muted": false,
+          "playlistIndex": -1,
+          "state": -1,
+          "time": 0,
+          "videoId": "jfKfPfyJRdk",
+          "volume": 100
+        },
+        "variant": "wails"
+      },
+      {
+        "key": "error",
+        "t": 1208,
+        "value": 150,
+        "variant": "wails"
+      },
+      {
+        "key": "env",
+        "t": 1206,
+        "value": {
+          "hasBeenActive": false,
+          "href": "http://wails.localhost/?variant=wails\u0026port=56662\u0026selftest=true",
+          "origin": "http://wails.localhost",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+        },
+        "variant": "wails"
+      },
+      {
+        "key": "liveUnmutedNoGesture",
+        "t": 16316,
+        "value": {
+          "isLive": false,
+          "muted": false,
+          "ok": false,
+          "playlistIndex": -1,
+          "state": -1,
+          "time": 0,
+          "videoId": "jfKfPfyJRdk",
+          "volume": 100
+        },
+        "variant": "wails"
+      },
+      {
+        "key": "liveMutedNoGesture",
+        "t": 31427,
+        "value": {
+          "isLive": false,
+          "muted": true,
+          "ok": false,
+          "playlistIndex": -1,
+          "state": -1,
+          "time": 0,
+          "videoId": "jfKfPfyJRdk",
+          "volume": 100
+        },
+        "variant": "wails"
+      },
+      {
+        "key": "unmuteAfterMutedPlay",
+        "t": 32931,
+        "value": {
+          "isLive": false,
+          "muted": false,
+          "playlistIndex": -1,
+          "state": -1,
+          "time": 0,
+          "videoId": "jfKfPfyJRdk",
+          "volume": 100
+        },
+        "variant": "wails"
+      },
+      {
+        "key": "setVolume30",
+        "t": 33448,
+        "value": {
+          "ok": true,
+          "volume": 30
+        },
+        "variant": "wails"
+      },
+      {
+        "key": "pause",
+        "t": 34961,
+        "value": {
+          "isLive": false,
+          "muted": false,
+          "ok": false,
+          "playlistIndex": -1,
+          "state": -1,
+          "time": 0,
+          "videoId": "jfKfPfyJRdk",
+          "volume": 30
+        },
+        "variant": "wails"
+      },
+      {
+        "key": "state",
+        "t": 35625,
+        "value": 3,
+        "variant": "wails"
+      },
+      {
+        "key": "state",
+        "t": 36572,
+        "value": 1,
+        "variant": "wails"
+      },
+      {
+        "key": "state",
+        "t": 37019,
+        "value": 2,
+        "variant": "wails"
+      },
+      {
+        "key": "state",
+        "t": 37028,
+        "value": -1,
+        "variant": "wails"
+      },
+      {
+        "key": "state",
+        "t": 37039,
+        "value": 3,
+        "variant": "wails"
+      },
+      {
+        "key": "state",
+        "t": 37379,
+        "value": 1,
+        "variant": "wails"
+      },
+      {
+        "key": "arrayPlaylistNext",
+        "t": 40986,
+        "value": {
+          "after": {
+            "isLive": false,
+            "muted": false,
+            "playlistIndex": 1,
+            "state": 1,
+            "time": 3.6,
+            "videoId": "dQw4w9WgXcQ",
+            "volume": 30
+          },
+          "before": {
+            "isLive": false,
+            "muted": false,
+            "playlistIndex": 0,
+            "state": 1,
+            "time": 0.4,
+            "videoId": "M7lc1UVf-VE",
+            "volume": 30
+          },
+          "ok": true
+        },
+        "variant": "wails"
+      },
+      {
+        "key": "setShuffle",
+        "t": 40987,
+        "value": {
+          "ok": true
+        },
+        "variant": "wails"
+      },
+      {
+        "key": "state",
+        "t": 41021,
+        "value": 2,
+        "variant": "wails"
+      },
+      {
+        "key": "state",
+        "t": 41025,
+        "value": -1,
+        "variant": "wails"
+      },
+      {
+        "key": "state",
+        "t": 41039,
+        "value": 3,
+        "variant": "wails"
+      },
+      {
+        "key": "error",
+        "t": 41148,
+        "value": 150,
+        "variant": "wails"
+      },
+      {
+        "key": "state",
+        "t": 41149,
+        "value": -1,
+        "variant": "wails"
+      },
+      {
+        "key": "invalidVideo",
+        "t": 48994,
+        "value": {
+          "errors": [
+            {
+              "code": 150,
+              "videoId": "invalid0000"
+            }
+          ],
+          "gotError": true
+        },
+        "variant": "wails"
+      },
+      {
+        "key": "allErrors",
+        "t": 48995,
+        "value": [
+          {
+            "code": 150,
+            "videoId": "jfKfPfyJRdk"
+          },
+          {
+            "code": 150,
+            "videoId": "invalid0000"
+          }
+        ],
+        "variant": "wails"
+      },
+      {
+        "key": "done",
+        "t": 48995,
+        "value": true,
+        "variant": "wails"
+      }
+    ]
+  },
+  "done": {
+    "localhttp": true,
+    "wails": true
+  },
+  "referersSeenByLocalServer": {
+    "localhttp": "http://127.0.0.1:56662/?variant=localhttp\u0026port=56662\u0026selftest=true",
+    "wails": "http://wails.localhost/"
+  }
+}

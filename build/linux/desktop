@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=Focus Widget
+Comment=Pomodoro timer widget with YouTube focus music
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/focuswidget.exe %u
+Terminal=false
+Type=Application
+Icon=focuswidget.exe
+Categories=Utility;
+StartupWMClass=focuswidget.exe
+
+ 

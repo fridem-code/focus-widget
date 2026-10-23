@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MsixPackagingToolTemplate
+    xmlns="http://schemas.microsoft.com/msix/packaging/msixpackagingtool/template/2022">
+    <Settings
+        AllowTelemetry="false"
+        ApplyACLsToPackageFiles="true"
+        GenerateCommandLineFile="true"
+        AllowPromptForPassword="false">
+    </Settings>
+    <Installer
+        Path="focuswidget.exe"
+        Arguments=""
+        InstallLocation="C:\Program Files\Focus Widget\Focus Widget">
+    </Installer>
+    <PackageInformation
+        PackageName="Focus Widget"
+        PackageDisplayName="Focus Widget"
+        PublisherName="CN=Focus Widget"
+        PublisherDisplayName="Focus Widget"
+        Version="0.1.0.0"
+        PackageDescription="Pomodoro timer widget with YouTube focus music">
+        <Capabilities>
+            <Capability Name="runFullTrust" />
+            
+        </Capabilities>
+        <Applications>
+            <Application
+                Id="com.focuswidget.app"
+                Description="Pomodoro timer widget with YouTube focus music"
+                DisplayName="Focus Widget"
+                ExecutableName="focuswidget.exe"
+                EntryPoint="Windows.FullTrustApplication">
+                
+            </Application>
+        </Applications>
+        <Resources>
+            <Resource Language="en-us" />
+        </Resources>
+        <Dependencies>
+            <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+        </Dependencies>
+        <Properties>
+            <Framework>false</Framework>
+            <DisplayName>Focus Widget</DisplayName>
+            <PublisherDisplayName>Focus Widget</PublisherDisplayName>
+            <Description>Pomodoro timer widget with YouTube focus music</Description>
+            <Logo>Assets\AppIcon.png</Logo>
+        </Properties>
+    </PackageInformation>
+    <SaveLocation PackagePath="focuswidget.msix" />
+    <PackageIntegrity>
+        <CertificatePath></CertificatePath>
+    </PackageIntegrity>
+</MsixPackagingToolTemplate>
