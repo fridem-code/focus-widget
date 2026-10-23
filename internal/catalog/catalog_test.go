@@ -16,6 +16,15 @@ func TestDefaultCatalogIsValid(t *testing.T) {
 	if _, ok := c.Genre("lofi"); !ok {
 		t.Fatal(`default catalog lacks the "lofi" genre that config.Default() selects`)
 	}
+	// The four genres of the design (SPEC §5.3); whether each source actually
+	// plays is checked by scripts/catalog-check, which needs the real player.
+	var ids []string
+	for _, g := range c.Genres {
+		ids = append(ids, g.ID)
+	}
+	if want := []string{"lofi", "ambient", "classical", "noise"}; !reflect.DeepEqual(ids, want) {
+		t.Fatalf("genres = %v, want %v", ids, want)
+	}
 }
 
 func TestValidate(t *testing.T) {

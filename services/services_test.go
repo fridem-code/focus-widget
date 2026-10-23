@@ -11,6 +11,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"focuswidget/internal/catalog"
 	"focuswidget/internal/config"
 	"focuswidget/internal/timer"
 )
@@ -119,6 +120,13 @@ func TestTimerServiceForwardsEvents(t *testing.T) {
 	svc.Reset()
 	if st := svc.State(); st.Phase != timer.Focus || st.Status != timer.Idle {
 		t.Fatalf("after Reset: %+v", st)
+	}
+}
+
+func TestMusicServiceGenres(t *testing.T) {
+	c := catalog.Default()
+	if got := NewMusicService(c).Genres(); !reflect.DeepEqual(got, c) {
+		t.Fatalf("Genres() = %+v, want %+v", got, c)
 	}
 }
 

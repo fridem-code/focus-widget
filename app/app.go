@@ -10,6 +10,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"focuswidget/internal/catalog"
 	"focuswidget/internal/config"
 	"focuswidget/internal/timer"
 	"focuswidget/services"
@@ -40,6 +41,8 @@ func New(assets fs.FS) (*application.App, error) {
 		logger.Error("load settings", "err", err)
 	}
 
+	genres := catalog.Load(dir, logger)
+
 	t, err := timer.New(services.TimerConfig(settings.Timer), timer.SystemClock())
 	if err != nil {
 		return nil, fmt.Errorf("create timer: %w", err)
@@ -55,6 +58,7 @@ func New(assets fs.FS) (*application.App, error) {
 		Services: []application.Service{
 			application.NewService(services.NewTimerService(t, emitter)),
 			application.NewService(services.NewSettingsService(store, settings, t, emitter)),
+			application.NewService(services.NewMusicService(genres)),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

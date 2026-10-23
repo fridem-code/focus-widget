@@ -41,6 +41,8 @@ Go + [Wails v3](https://v3.wails.io) (WebView2), интерфейс на Vue 3 +
 
 В production-сборку ни то ни другое не попадает.
 
+Проверка каталога жанров: `powershell -File scripts/catalog-check/run.ps1 [-Candidates c.json]` после `wails3 build DEV=true`. Каждый источник проигрывается без звука в настоящем YouTube-плеере приложения (origin `wails.localhost`). Через `-Candidates` можно проверить источники, которых ещё нет в каталоге. Запускать перед правкой `internal/catalog/default_genres.json`.
+
 Скриптовая проверка интерфейса: `powershell -File scripts/ui-check/run.ps1` после `wails3 build DEV=true`. Скрипт кладёт виджет поверх тестового окна с цветным фоном, прокликивает состояния таймера и печатает DOM каждого шага, а скриншоты сохраняет в `scripts/ui-check/out`. Подробности — в шапке `run.ps1`.
 
 Настройки лежат в `%APPDATA%\FocusWidget\config.json`.

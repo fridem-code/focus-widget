@@ -4,11 +4,35 @@
       "id": "lofi",
       "name": "Lo-fi",
       "sources": [
-        {
-          "type": "video",
-          "id": "CFGLoQIhmow",
-          "title": "lofi hip hop mix — beats to relax/study to (Part 1)"
-        }
+        { "type": "playlist", "id": "PL6NdkXsPL07Il2hEQGcLI4dg_LTg7xA2L", "title": "Lofi Girl — Radios (live)" },
+        { "type": "playlist", "id": "PLt7bG0K25iXi9KIt6P6yStMp9ObzXjApm", "title": "Chillhop Music — chill beat mixes" },
+        { "type": "video", "id": "CFGLoQIhmow", "title": "lofi hip hop mix — beats to relax/study to (Part 1)" }
+      ]
+    },
+    {
+      "id": "ambient",
+      "name": "Эмбиент",
+      "sources": [
+        { "type": "playlist", "id": "PLuqZTQ_5gspqRHmzt5Yb5-8GN2t61ZNuv", "title": "SpaceAmbient — Stellardrone" },
+        { "type": "playlist", "id": "PLuqZTQ_5gsppMEJWlJoH327iOkKLtcNHX", "title": "SpaceAmbient Playlist" },
+        { "type": "video", "id": "XMsp0TBTgxQ", "title": "Ambient Study Music For Focus — 3 Hours" }
+      ]
+    },
+    {
+      "id": "classical",
+      "name": "Классика",
+      "sources": [
+        { "type": "playlist", "id": "PLcGkkXtask_eYr5C29azb7JHrEA2KsziK", "title": "HALIDONMUSIC — Classical Music for Working" },
+        { "type": "playlist", "id": "PLIvKDmMedl4104UE3GFZS9cYt7bpgN1A8", "title": "Classical music for studying" }
+      ]
+    },
+    {
+      "id": "noise",
+      "name": "Белый шум",
+      "sources": [
+        { "type": "video", "id": "nMfPqeZjc2c", "title": "White Noise Black Screen — 10 Hours" },
+        { "type": "video", "id": "yLOM8R6lbzg", "title": "Studying White Noise — 10 Hours" },
+        { "type": "video", "id": "9HeGgJSyVec", "title": "Super Deep Brown Noise — 10 Hours" }
       ]
     }
   ]
