@@ -41,6 +41,8 @@ func TestValidateAndNormalize(t *testing.T) {
 			func(s Settings) bool { return s.Music.BreakBehavior == BreakPause }},
 		{"window mode", func(s *Settings) { s.Window.Mode = "fullscreen" }, "window.mode",
 			func(s Settings) bool { return s.Window.Mode == WindowExpanded }},
+		{"theme", func(s *Settings) { s.Window.Theme = "sepia" }, "window.theme",
+			func(s Settings) bool { return s.Window.Theme == ThemeSystem }},
 		{"half a position", func(s *Settings) { s.Window.X = new(10) }, "window.x/y",
 			func(s Settings) bool { return s.Window.X == nil && s.Window.Y == nil }},
 	}

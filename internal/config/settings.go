@@ -26,6 +26,15 @@ const (
 	WindowCompact  WindowMode = "compact"
 )
 
+// Theme: "system" follows the Windows light/dark setting.
+type Theme string
+
+const (
+	ThemeSystem Theme = "system"
+	ThemeDark   Theme = "dark"
+	ThemeLight  Theme = "light"
+)
+
 type Settings struct {
 	Version int            `json:"version"`
 	Timer   TimerSettings  `json:"timer"`
@@ -56,6 +65,7 @@ type MusicSettings struct {
 type WindowSettings struct {
 	Mode        WindowMode `json:"mode"`
 	AlwaysOnTop bool       `json:"alwaysOnTop"`
+	Theme       Theme      `json:"theme"`
 	// X and Y are nil until the window has been moved; the app then picks a default position.
 	X *int `json:"x"`
 	Y *int `json:"y"`
@@ -95,6 +105,7 @@ func Default() Settings {
 		Window: WindowSettings{
 			Mode:        WindowExpanded,
 			AlwaysOnTop: true,
+			Theme:       ThemeSystem,
 		},
 		Notify: NotifySettings{Sound: true, Toast: true},
 	}
@@ -160,6 +171,12 @@ func (s *Settings) check(fix bool) []string {
 	default:
 		report("window.mode", s.Window.Mode, "is not expanded|compact",
 			func() { s.Window.Mode = def.Window.Mode })
+	}
+	switch s.Window.Theme {
+	case ThemeSystem, ThemeDark, ThemeLight:
+	default:
+		report("window.theme", s.Window.Theme, "is not system|dark|light",
+			func() { s.Window.Theme = def.Window.Theme })
 	}
 	if (s.Window.X == nil) != (s.Window.Y == nil) {
 		report("window.x/y", "", "must be both set or both null", func() { s.Window.X, s.Window.Y = nil, nil })

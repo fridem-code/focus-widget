@@ -160,6 +160,19 @@ func TestLoadResetsInvalidValuesOnly(t *testing.T) {
 	}
 }
 
+// Files written before window.theme existed load with the default theme.
+func TestLoadFileWithoutThemeUsesSystem(t *testing.T) {
+	s := newTestStore(t)
+	writeFile(t, s.Path(), `{"version": 1, "window": {"mode": "compact", "alwaysOnTop": false, "x": null, "y": null}}`)
+	got, err := s.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Window.Theme != ThemeSystem || got.Window.Mode != WindowCompact || got.Window.AlwaysOnTop {
+		t.Fatalf("window = %+v", got.Window)
+	}
+}
+
 func TestLoadNewerVersionBestEffort(t *testing.T) {
 	s := newTestStore(t)
 	writeFile(t, s.Path(), `{"version": 99, "timer": {"focusMin": 30}, "futureField": true}`)

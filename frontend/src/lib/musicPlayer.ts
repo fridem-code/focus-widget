@@ -291,6 +291,14 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
       if (state.ready) applyVolume()
     },
 
+    /** Shuffle for playlists: applies to the current playlist at once and to later ones. */
+    setShuffle(on: boolean) {
+      shuffle = on
+      if (player && state.ready && source()?.type === SourceType.SourcePlaylist) {
+        player.setShuffle(on)
+      }
+    },
+
     /**
      * Plays at most `volume` until called with null, without touching the
      * user's volume. Ducking never makes music louder than the user set it.

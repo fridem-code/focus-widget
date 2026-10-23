@@ -23,6 +23,10 @@
   --track: light-dark(rgba(20, 24, 40, 0.1), rgba(255, 255, 255, 0.14));
   --pill-neutral: light-dark(rgba(20, 24, 40, 0.06), rgba(255, 255, 255, 0.08));
   --popover: light-dark(rgba(250, 250, 252, 0.98), rgba(36, 38, 50, 0.97));
+  --field-bg: light-dark(rgba(20, 24, 40, 0.05), rgba(255, 255, 255, 0.06));
+  --field-border: light-dark(rgba(20, 24, 40, 0.16), rgba(255, 255, 255, 0.14));
+  --segment-active: light-dark(#ffffff, rgba(255, 255, 255, 0.16));
+  --danger: light-dark(#b42318, #ff8a80);
   --pill-neutral-text: light-dark(#4e5363, #c4c8d4);
 
   --player-bg: #05060a;

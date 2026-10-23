@@ -279,6 +279,80 @@ func TestSettingsUpdateRejectsInvalid(t *testing.T) {
 	}
 }
 
+func ptr[T any](v T) *T { return &v }
+
+func TestSettingsPatchChangesOnlyGivenFields(t *testing.T) {
+	svc, store, tm, _ := newSettingsService(t)
+	before := svc.Get()
+
+	got, err := svc.Patch(SettingsPatch{
+		FocusMin: ptr(40), AutoStartFocus: ptr(true),
+		BreakBehavior: ptr(config.BreakDuck), DuckVolume: ptr(35),
+		Toast: ptr(false), Theme: ptr(config.ThemeDark),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := before
+	want.Timer.FocusMin, want.Timer.AutoStartFocus = 40, true
+	want.Music.BreakBehavior, want.Music.DuckVolume = config.BreakDuck, 35
+	want.Notify.Toast = false
+	want.Window.Theme = config.ThemeDark
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Patch() = %+v, want %+v", got, want)
+	}
+	if saved, _ := store.Load(); !reflect.DeepEqual(saved, want) {
+		t.Fatalf("saved %+v, want %+v", saved, want)
+	}
+	if st := tm.State(); st.RemainingMs != (40 * time.Minute).Milliseconds() {
+		t.Fatalf("timer not updated: %+v", st)
+	}
+
+	if _, err := svc.Patch(SettingsPatch{}); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(svc.Get(), want) {
+		t.Fatalf("empty patch changed settings: %+v", svc.Get())
+	}
+}
+
+func TestSettingsPatchKeepsChangesMadeMeanwhile(t *testing.T) {
+	svc, _, _, _ := newSettingsService(t)
+	music := NewMusicService(catalog.Default(), svc)
+
+	// The screen's patch follows a volume save it hasn't seen yet.
+	if err := music.SaveVolume(15, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Patch(SettingsPatch{Shuffle: ptr(false)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Patch(SettingsPatch{Sound: ptr(false)}); err != nil {
+		t.Fatal(err)
+	}
+	got := svc.Get()
+	if got.Music.Volume != 15 || got.Music.Shuffle || got.Notify.Sound {
+		t.Fatalf("settings = %+v, want volume 15, shuffle and sound off", got)
+	}
+}
+
+func TestSettingsPatchRejectsInvalid(t *testing.T) {
+	svc, _, _, emit := newSettingsService(t)
+	before := svc.Get()
+
+	_, err := svc.Patch(SettingsPatch{FocusMin: ptr(0), Theme: ptr(config.Theme("blue"))})
+	var ve *config.ValidationError
+	if !errors.As(err, &ve) || len(ve.Problems) != 2 {
+		t.Fatalf("Patch() err = %v, want ValidationError with 2 problems", err)
+	}
+	if !reflect.DeepEqual(svc.Get(), before) {
+		t.Fatalf("settings changed after a rejected patch: %+v", svc.Get())
+	}
+	if ev := emit.take(); len(ev) != 0 {
+		t.Fatalf("emitted %+v", ev)
+	}
+}
+
 func TestSettingsConcurrentUpdatesStayConsistent(t *testing.T) {
 	svc, store, tm, _ := newSettingsService(t)
 

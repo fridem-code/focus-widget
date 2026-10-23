@@ -16,9 +16,10 @@ describe('TitleBar', () => {
     expect(hide).toHaveBeenCalledOnce()
   })
 
-  it('keeps settings disabled until they are implemented', () => {
+  it('opens the settings', async () => {
     const wrapper = mount(TitleBar)
-    expect(wrapper.get('button[aria-label="Настройки"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('button[aria-label="Настройки"]').trigger('click')
+    expect(wrapper.emitted('settings')).toHaveLength(1)
   })
 
   it('asks for compact mode', async () => {

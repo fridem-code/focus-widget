@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Events } from '@wailsio/runtime'
-import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import {
   UiCommand,
   WindowMode as WindowModeEvent,
@@ -8,16 +8,23 @@ import {
 } from '../bindings/events'
 import { WindowMode } from '../bindings/focuswidget/internal/config/models'
 import { Phase } from '../bindings/focuswidget/internal/timer/models'
-import { MusicService, SettingsService, WindowService } from '../bindings/focuswidget/services'
+import {
+  MusicService,
+  SettingsService,
+  TimerService,
+  WindowService,
+} from '../bindings/focuswidget/services'
 import CompactBar from './components/CompactBar.vue'
 import MusicRow from './components/MusicRow.vue'
 import PlayerPanel from './components/PlayerPanel.vue'
+import SettingsPanel from './components/SettingsPanel.vue'
 import TimerControls from './components/TimerControls.vue'
 import TimerView from './components/TimerView.vue'
 import TitleBar from './components/TitleBar.vue'
 import { useMusic } from './composables/useMusic'
 import { connectMusicPolicy } from './composables/useMusicPolicy'
 import { connectPhaseSound } from './composables/usePhaseSound'
+import { applyTheme, createSettingsStore, type SettingsStore } from './composables/useSettings'
 import { useTimer } from './composables/useTimer'
 import { useWindowActive } from './composables/useWindowActive'
 import { persistMusic } from './lib/persistMusic'
@@ -29,16 +36,37 @@ const music = useMusic()
 const active = useWindowActive()
 const genreMenuOpen = ref(false)
 const ready = ref(false)
+const store = shallowRef<SettingsStore>()
 const windowMode = shallowRef<WindowModeController>()
 const compact = computed(() => windowMode.value?.mode.value === 'compact')
 /** False while hidden in the tray. */
 const visible = ref(true)
+const screen = ref<'timer' | 'settings'>('timer')
+/**
+ * Whether the YouTube player can be seen. It can't in compact mode, in the
+ * tray or behind the settings screen, and an unseen player must not play
+ * (SPEC §2): the music policy treats all three like compact mode.
+ */
+const playerShown = computed(() => visible.value && !compact.value && screen.value === 'timer')
 let policy: MusicPolicyRunner | undefined
 let stopPersist: (() => void) | undefined
 const offEvents: (() => void)[] = []
 
 onMounted(async () => {
   const [catalog, settings] = await Promise.all([MusicService.Genres(), SettingsService.Get()])
+  const settingsStore = createSettingsStore(settings)
+  store.value = settingsStore
+  offEvents.push(settingsStore.stop)
+  applyTheme(settings.window.theme)
+  watch(
+    () => settingsStore.settings.value.window.theme,
+    (t) => applyTheme(t),
+  )
+  watch(
+    () => settingsStore.settings.value.music.shuffle,
+    (on) => music.setShuffle(on),
+  )
+
   music.configure({
     catalog,
     genreId: settings.music.genreId,
@@ -51,7 +79,11 @@ onMounted(async () => {
   offEvents.push(connectPhaseSound(settings))
   const runner = connectMusicPolicy(music, settings)
   policy = runner
-  windowMode.value = createWindowMode({
+  watch(playerShown, (shown) => {
+    if (state.value) runner.mode(shown ? 'expanded' : 'compact', state.value)
+  })
+
+  const wm = createWindowMode({
     initial: settings.window.mode === WindowMode.WindowCompact ? 'compact' : 'expanded',
     setMode: (m) =>
       WindowService.SetMode(m === 'compact' ? WindowMode.WindowCompact : WindowMode.WindowExpanded),
@@ -59,19 +91,18 @@ onMounted(async () => {
       Events.On(WindowModeEvent, (ev) =>
         cb(ev.data === WindowMode.WindowCompact ? 'compact' : 'expanded'),
       ),
-    beforeCompact: () => state.value && runner.mode('compact', state.value),
-    // Growing while hidden in the tray must not start the (invisible) player.
-    afterExpand: () => visible.value && state.value && runner.mode('expanded', state.value),
+    // Pause before the window shrinks; resuming after it grows is playerShown's job.
+    beforeCompact: () => {
+      screen.value = 'timer'
+      if (state.value) runner.mode('compact', state.value)
+    },
+    afterExpand: () => {},
   })
-  const wm = windowMode.value
+  windowMode.value = wm
 
-  // Hidden in the tray the player is not visible, which for YouTube is the
-  // same as compact mode: music waits until the window is back (SPEC §2, §3.4).
   offEvents.push(
     Events.On(WindowVisibleEvent, (ev) => {
       visible.value = ev.data
-      if (!state.value) return
-      runner.mode(ev.data ? wm.mode.value : 'compact', state.value)
     }),
     // Tray commands the frontend carries out: it owns the player and the
     // order of pausing and resizing.
@@ -95,11 +126,17 @@ onUnmounted(() => {
 
 // Starting a focus phase plays synchronously inside the click handler, before
 // the round trip to Go (SPEC §5); the policy then confirms it on timer:transition.
-// A break may want silence and compact mode always does, so those are left to
-// the policy.
+// A break may want silence and an unseen player must stay silent, so those are
+// left to the policy.
 function onStart() {
-  if (visible.value && !compact.value && state.value?.phase === Phase.Focus) music.play()
+  if (playerShown.value && state.value?.phase === Phase.Focus) music.play()
   void start()
+}
+
+function setAlwaysOnTop(on: boolean) {
+  WindowService.SetAlwaysOnTop(on).catch((err: unknown) =>
+    console.warn('always-on-top failed:', err),
+  )
 }
 </script>
 
@@ -111,10 +148,18 @@ function onStart() {
     :data-phase="state?.phase ?? 'focus'"
     :data-inactive="active ? undefined : ''"
   >
-    <TitleBar v-if="!compact" @compact="windowMode?.compact()" />
-    <!-- Hidden, not unmounted, in compact mode: the stream must not reload (SPEC §3.4). -->
-    <PlayerPanel v-show="!compact" :music="music" @choose-genre="genreMenuOpen = true" />
-    <template v-if="state && !compact">
+    <TitleBar
+      v-if="!compact && screen === 'timer'"
+      @compact="windowMode?.compact()"
+      @settings="screen = 'settings'"
+    />
+    <!-- Hidden, not unmounted: the stream must not reload (SPEC §3.4). -->
+    <PlayerPanel
+      v-show="!compact && screen === 'timer'"
+      :music="music"
+      @choose-genre="genreMenuOpen = true"
+    />
+    <template v-if="state && !compact && screen === 'timer'">
       <TimerView :state="state" />
       <MusicRow
         v-if="music.state.configured"
@@ -131,6 +176,18 @@ function onStart() {
         @reset-phase="resetPhase"
       />
     </template>
+    <SettingsPanel
+      v-if="store && !compact && screen === 'settings'"
+      :settings="store.settings.value"
+      :genres="music.genres()"
+      :genre-id="music.state.genreId"
+      :save="store.patch"
+      @back="screen = 'timer'"
+      @hide="WindowService.Hide()"
+      @genre="music.selectGenre($event)"
+      @always-on-top="setAlwaysOnTop"
+      @reset-cycle="TimerService.Reset()"
+    />
     <CompactBar
       v-if="state && compact"
       :state="state"

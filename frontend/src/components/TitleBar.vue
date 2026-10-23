@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { WindowService } from '../../bindings/focuswidget/services'
 
-const emit = defineEmits<{ compact: [] }>()
+const emit = defineEmits<{ compact: []; settings: [] }>()
 
-// Settings (T12) are not wired yet, so its button is disabled. The cross
-// hides to the tray; only the tray's "Выход" quits (SPEC §3.4).
+// The cross hides to the tray; only the tray's "Выход" quits (SPEC §3.4).
 function hide() {
   void WindowService.Hide()
 }
@@ -14,7 +13,7 @@ function hide() {
   <header class="titlebar">
     <span class="name"><span class="dot" aria-hidden="true"></span>Focus</span>
     <div class="actions">
-      <button class="icon-button" type="button" aria-label="Настройки" disabled>
+      <button class="icon-button" type="button" aria-label="Настройки" @click="emit('settings')">
         <svg
           aria-hidden="true"
           width="18"

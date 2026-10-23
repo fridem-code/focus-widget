@@ -170,6 +170,15 @@ describe('playback', () => {
     expect(fake.calls.at(-1)).toBe('cueVideo vid-bbbbbbb')
   })
 
+  it('changes shuffle on the current playlist only', async () => {
+    const music = await started(config({ genreId: 'lofi', shuffle: true }))
+    music.setShuffle(false)
+    expect(fake.calls.at(-1)).toBe('shuffle false')
+    music.selectGenre('noise') // video sources: nothing to shuffle
+    music.setShuffle(true)
+    expect(fake.calls.at(-1)).toBe('loadVideo vid-aaaaaaa')
+  })
+
   it('applies volume and mute', async () => {
     const music = await started()
     music.setVolume(130)
