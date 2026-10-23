@@ -61,6 +61,13 @@
   --accent-soft: light-dark(rgba(14, 124, 107, 0.12), rgba(14, 124, 107, 0.28));
 }
 
+/* Window not in focus (design artboard "не в фокусе"): Windows swaps the
+   Acrylic for a solid fill; we dim the title and the title-bar icons. */
+[data-inactive] {
+  --text-title: light-dark(#575c6b, #a7acbb);
+  --icon: light-dark(#6d7282, #9da2b1);
+}
+
 *,
 *::before,
 *::after {

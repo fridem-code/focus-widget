@@ -19,9 +19,6 @@ import (
 const (
 	name        = "Focus Widget"
 	description = "Pomodoro timer widget with YouTube focus music"
-
-	expandedWidth  = 380
-	expandedHeight = 540
 )
 
 // New builds the application with its services and main widget window. assets
@@ -52,7 +49,12 @@ func New(assets fs.FS) (*application.App, error) {
 	// once the app runs, by which time emitter.app is set.
 	emitter := &appEmitter{}
 	settingsService := services.NewSettingsService(store, settings, t, emitter)
-	wailsApp := application.New(application.Options{
+	var wailsApp *application.App
+	var mainWindow *application.WebviewWindow
+	windowService := services.NewWindowService(settingsService, emitter,
+		func() services.Window { return mainWindow },
+		func() []*application.Screen { return wailsApp.Screen.GetAll() })
+	wailsApp = application.New(application.Options{
 		Name:        name,
 		Description: description,
 		Logger:      logger,
@@ -60,6 +62,7 @@ func New(assets fs.FS) (*application.App, error) {
 			application.NewService(services.NewTimerService(t, emitter)),
 			application.NewService(settingsService),
 			application.NewService(services.NewMusicService(genres, settingsService)),
+			application.NewService(windowService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -75,11 +78,15 @@ func New(assets fs.FS) (*application.App, error) {
 	})
 	emitter.app = wailsApp
 
-	wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:          "main",
-		Title:         name,
-		Width:         expandedWidth,
-		Height:        expandedHeight,
+	width, height := services.WindowSize(settings.Window.Mode)
+	mainWindow = wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name:   "main",
+		Title:  name,
+		Width:  width,
+		Height: height,
+		// Shown by WindowService once it is at its saved place, so it never
+		// flashes in the centre first.
+		Hidden:        true,
 		Frameless:     true,
 		AlwaysOnTop:   settings.Window.AlwaysOnTop,
 		DisableResize: true,

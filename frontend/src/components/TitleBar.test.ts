@@ -16,11 +16,14 @@ describe('TitleBar', () => {
     expect(quit).toHaveBeenCalledOnce()
   })
 
-  it('keeps settings and compact mode disabled until they are implemented', () => {
+  it('keeps settings disabled until they are implemented', () => {
     const wrapper = mount(TitleBar)
     expect(wrapper.get('button[aria-label="Настройки"]').attributes('disabled')).toBeDefined()
-    expect(
-      wrapper.get('button[aria-label="Свернуть в компактный режим"]').attributes('disabled'),
-    ).toBeDefined()
+  })
+
+  it('asks for compact mode', async () => {
+    const wrapper = mount(TitleBar)
+    await wrapper.get('button[aria-label="Свернуть в компактный режим"]').trigger('click')
+    expect(wrapper.emitted('compact')).toHaveLength(1)
   })
 })

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { Application } from '@wailsio/runtime'
 
-// Settings (T12) and compact mode (T9) are not wired yet, so their buttons are
-// disabled. T10 turns close into hide-to-tray; until then it quits.
+const emit = defineEmits<{ compact: [] }>()
+
+// Settings (T12) are not wired yet, so its button is disabled. T10 turns
+// close into hide-to-tray; until then it quits.
 function close() {
   void Application.Quit()
 }
@@ -29,7 +31,12 @@ function close() {
           <circle cx="18" cy="18" r="2" />
         </svg>
       </button>
-      <button class="icon-button" type="button" aria-label="Свернуть в компактный режим" disabled>
+      <button
+        class="icon-button"
+        type="button"
+        aria-label="Свернуть в компактный режим"
+        @click="emit('compact')"
+      >
         <svg
           aria-hidden="true"
           width="18"

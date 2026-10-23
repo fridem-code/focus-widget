@@ -14,6 +14,7 @@ const (
 	EventTimerState      = "timer:state"
 	EventTimerTransition = "timer:transition"
 	EventSettingsChanged = "settings:changed"
+	EventWindowMode      = "window:mode"
 )
 
 func init() {
@@ -22,6 +23,7 @@ func init() {
 	application.RegisterEvent[timer.State](EventTimerState)
 	application.RegisterEvent[timer.Transition](EventTimerTransition)
 	application.RegisterEvent[config.Settings](EventSettingsChanged)
+	application.RegisterEvent[config.WindowMode](EventWindowMode)
 }
 
 // Emitter publishes an event to the frontend; *application.EventManager
