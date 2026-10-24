@@ -5,6 +5,7 @@ Go + [Wails v3](https://v3.wails.io) (WebView2), интерфейс на Vue 3 +
 
 - ТЗ: [docs/SPEC.md](docs/SPEC.md)
 - Задачи: [docs/TASKS.md](docs/TASKS.md)
+- Роадмап после MVP: [docs/ROADMAP.md](docs/ROADMAP.md)
 - Результаты спайка (YouTube в WebView2): [docs/spike-results.md](docs/spike-results.md)
 
 ## Требования
