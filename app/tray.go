@@ -8,7 +8,8 @@ import (
 
 // buildTray creates the tray icon and menu (docs/SPEC.md §3.5) and hands them
 // to the tray controller, which keeps labels and tooltip up to date.
-// T13 replaces the default Wails icon with the app icon.
+// The icon is the exe's own (build/windows/icon.ico), which Wails picks up
+// when none is set.
 func buildTray(app *application.App, tray *services.Tray) {
 	menu := application.NewMenu()
 	visibility := menu.Add("Скрыть").OnClick(func(*application.Context) { tray.ToggleVisible() })

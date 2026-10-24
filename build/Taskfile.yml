@@ -82,8 +82,14 @@ tasks:
     sources:
       - "**/*"
       - exclude: node_modules/**/*
+      - exclude: dist/**/*
     generates:
       - dist/**/*
+    # The checksum above ignores DEV: also rebuild when dist holds the other
+    # mode's bundle (marker written by vite.config.ts). Without this a release
+    # exe once embedded the dev bundle, debug handle included.
+    status:
+      - '[ -f dist/.mode-{{if eq .DEV "true"}}development{{else}}production{{end}} ]'
     deps:
       - task: install:frontend:deps
       - task: generate:bindings

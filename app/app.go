@@ -1,12 +1,10 @@
 // Package app assembles the Wails application: options, services, the widget
-// window and, later, the tray (see docs/SPEC.md §3.4–3.5, §5).
+// window, the tray and the log (see docs/SPEC.md §3.4–3.5, §4, §5).
 package app
 
 import (
 	"fmt"
 	"io/fs"
-	"log/slog"
-	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
@@ -20,18 +18,19 @@ import (
 const (
 	name        = "Focus Widget"
 	description = "Pomodoro timer widget with YouTube focus music"
+	// Keep in step with build/config.yml.
+	version = "0.1.0"
 )
 
 // New builds the application with its services and main widget window. assets
 // must contain the built frontend (frontend/dist).
 func New(assets fs.FS) (*application.App, error) {
-	// File logging with rotation arrives in T13 (SPEC §4).
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-
 	dir, err := config.DefaultDir()
 	if err != nil {
 		return nil, err
 	}
+	logger, wailsLogger := newLoggers(dir)
+	logger.Info("start", "version", version)
 	store := config.NewStore(dir, logger)
 	settings, err := store.Load()
 	if err != nil {
@@ -64,7 +63,7 @@ func New(assets fs.FS) (*application.App, error) {
 	wailsApp = application.New(application.Options{
 		Name:        name,
 		Description: description,
-		Logger:      logger,
+		Logger:      wailsLogger,
 		// A second launch exits and brings the running widget's window back (SPEC §3.9).
 		SingleInstance: &application.SingleInstanceOptions{
 			UniqueID:               "com.focuswidget.app",

@@ -17,3 +17,6 @@ func devBrowserArgs() []string {
 	}
 	return []string{"--remote-debugging-port=" + strconv.Itoa(port)}
 }
+
+// logToConsole mirrors the log to stderr in dev builds.
+const logToConsole = true

@@ -3,3 +3,5 @@
 package app
 
 func devBrowserArgs() []string { return nil }
+
+const logToConsole = false

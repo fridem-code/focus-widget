@@ -16,6 +16,7 @@ Go + [Wails v3](https://v3.wails.io) (WebView2), интерфейс на Vue 3 +
 | Wails CLI | v3.0.0-beta.34 | `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.34` |
 | golangci-lint | v2 | `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest` |
 | WebView2 Runtime | — | есть в Windows 11; проверка: `wails3 doctor` |
+| NSIS | 3.x | только для `wails3 task package`. Админ-права не нужны: распакуйте `nsis-3.13.zip` с https://nsis.sourceforge.io/Download (не setup.exe) и добавьте папку в `PATH` на время сборки |
 
 Отдельный Task CLI не нужен: таски запускаются раннером, встроенным в Wails (`wails3 task <имя>`).
 
@@ -29,7 +30,7 @@ Go + [Wails v3](https://v3.wails.io) (WebView2), интерфейс на Vue 3 +
 | `wails3 task lint` | golangci-lint + ESLint + Prettier check + vue-tsc |
 | `wails3 task fmt` | форматирование Go и фронтенда |
 | `wails3 task bindings` | перегенерировать TS-биндинги Go-сервисов в `frontend/bindings` |
-| `wails3 task package` | установщик (нужен NSIS, задача T13) |
+| `wails3 task package` | установщик `bin/focuswidget-amd64-installer.exe` (нужен NSIS) |
 
 `test` и `lint` сначала собирают фронтенд: Go встраивает `frontend/dist` через `go:embed`, а vue-tsc нужны сгенерированные биндинги.
 
@@ -45,7 +46,18 @@ Go + [Wails v3](https://v3.wails.io) (WebView2), интерфейс на Vue 3 +
 
 Скриптовая проверка интерфейса: `powershell -File scripts/ui-check/run.ps1` после `wails3 build DEV=true`. Скрипт кладёт виджет поверх тестового окна с цветным фоном, прокликивает состояния таймера и печатает DOM каждого шага, а скриншоты сохраняет в `scripts/ui-check/out`. Подробности — в шапке `run.ps1`.
 
-Настройки лежат в `%APPDATA%\FocusWidget\config.json`.
+Настройки лежат в `%APPDATA%\FocusWidget\config.json`, журнал — в `%APPDATA%\FocusWidget\logs\app.log` (ротация: 5 файлов по 1 МБ), отчёт о падении — в `logs\crash.log`.
+
+Замер требований §4 (размер, старт, простой): `powershell -File scripts/nfr-check/run.ps1` после `wails3 build`.
+
+## Выпуск
+
+```powershell
+$env:PATH = "$env:USERPROFILE\tools\nsis-3.13;$env:PATH"   # папка с makensis.exe
+wails3 task package
+```
+
+Установщик `bin\focuswidget-amd64-installer.exe` ставит виджет для текущего пользователя в `%LOCALAPPDATA%\Programs\Focus Widget`, без UAC. Тихая установка — `/S`, тихое удаление — `uninstall.exe /S` (настройки при этом остаются). Версия задаётся в трёх местах: `build/config.yml`, `build/windows/info.json` и `app/app.go`. Перед выпуском пройдите [чек-лист](docs/release-checklist.md). Как перерисовать иконку — в [build/icon-src](build/icon-src/README.md).
 
 ## Структура
 
@@ -56,6 +68,6 @@ services/          Wails-сервисы (с T4)
 internal/          логика без зависимости от Wails: timer, config, catalog (с T2/T3)
 frontend/          Vue + TS (src/components, src/composables, src/lib)
 build/             иконки, манифесты, NSIS, платформенные Taskfile
-docs/              ТЗ, задачи, результаты спайка
+docs/              ТЗ, задачи, результаты спайка, релизный чек-лист
 spike/t0-youtube/  код спайка T0, в сборку не входит
 ```

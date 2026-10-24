@@ -279,16 +279,14 @@ func TestSettingsUpdateRejectsInvalid(t *testing.T) {
 	}
 }
 
-func ptr[T any](v T) *T { return &v }
-
 func TestSettingsPatchChangesOnlyGivenFields(t *testing.T) {
 	svc, store, tm, _ := newSettingsService(t)
 	before := svc.Get()
 
 	got, err := svc.Patch(SettingsPatch{
-		FocusMin: ptr(40), AutoStartFocus: ptr(true),
-		BreakBehavior: ptr(config.BreakDuck), DuckVolume: ptr(35),
-		Toast: ptr(false), Theme: ptr(config.ThemeDark),
+		FocusMin: new(40), AutoStartFocus: new(true),
+		BreakBehavior: new(config.BreakDuck), DuckVolume: new(35),
+		Toast: new(false), Theme: new(config.ThemeDark),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -324,10 +322,10 @@ func TestSettingsPatchKeepsChangesMadeMeanwhile(t *testing.T) {
 	if err := music.SaveVolume(15, false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.Patch(SettingsPatch{Shuffle: ptr(false)}); err != nil {
+	if _, err := svc.Patch(SettingsPatch{Shuffle: new(false)}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.Patch(SettingsPatch{Sound: ptr(false)}); err != nil {
+	if _, err := svc.Patch(SettingsPatch{Sound: new(false)}); err != nil {
 		t.Fatal(err)
 	}
 	got := svc.Get()
@@ -340,7 +338,7 @@ func TestSettingsPatchRejectsInvalid(t *testing.T) {
 	svc, _, _, emit := newSettingsService(t)
 	before := svc.Get()
 
-	_, err := svc.Patch(SettingsPatch{FocusMin: ptr(0), Theme: ptr(config.Theme("blue"))})
+	_, err := svc.Patch(SettingsPatch{FocusMin: new(0), Theme: new(config.Theme("blue"))})
 	var ve *config.ValidationError
 	if !errors.As(err, &ve) || len(ve.Problems) != 2 {
 		t.Fatalf("Patch() err = %v, want ValidationError with 2 problems", err)
