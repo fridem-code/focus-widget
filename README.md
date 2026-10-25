@@ -58,6 +58,10 @@ $env:PATH = "$env:USERPROFILE\tools\nsis-3.13;$env:PATH"   # папка с maken
 wails3 task package
 ```
 
+`wails3 task package` сам собирает release-exe перед упаковкой, отдельный `wails3 task build` не нужен.
+
+Перед запуском новой сборки (exe или установленной) закройте работающий виджет: трей → «Выход». Виджет запускается в одном экземпляре, поэтому новая версия при запущенной старой просто покажет окно старой.
+
 Установщик `bin\focuswidget-amd64-installer.exe` ставит виджет для текущего пользователя в `%LOCALAPPDATA%\Programs\Focus Widget`, без UAC. Тихая установка — `/S`, тихое удаление — `uninstall.exe /S` (настройки при этом остаются). Версия задаётся в трёх местах: `build/config.yml`, `build/windows/info.json` и `app/app.go`. Перед выпуском пройдите [чек-лист](docs/release-checklist.md). Как перерисовать иконку — в [build/icon-src](build/icon-src/README.md).
 
 ## Структура
