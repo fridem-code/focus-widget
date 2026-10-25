@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -25,6 +26,9 @@ const (
 	SourcePlaylist SourceType = "playlist"
 	// SourceVideo is a single video or a live stream.
 	SourceVideo SourceType = "video"
+	// SourceNoise is noise the app generates itself (T17): no YouTube, no
+	// network. Its id is the kind of noise, one of NoiseKinds.
+	SourceNoise SourceType = "noise"
 )
 
 type Source struct {
@@ -45,6 +49,9 @@ type Catalog struct {
 
 //go:embed default_genres.json
 var defaultJSON []byte
+
+// NoiseKinds are the noises the frontend can generate (src/lib/noise.ts).
+var NoiseKinds = []string{"white", "pink", "brown", "rain"}
 
 var (
 	videoIDRe    = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)
@@ -137,8 +144,12 @@ func (s Source) validate() error {
 		if !playlistIDRe.MatchString(s.ID) {
 			return fmt.Errorf("playlist id %q must be 10-64 characters of [A-Za-z0-9_-]", s.ID)
 		}
+	case SourceNoise:
+		if !slices.Contains(NoiseKinds, s.ID) {
+			return fmt.Errorf("noise %q must be one of %s", s.ID, strings.Join(NoiseKinds, "|"))
+		}
 	default:
-		return fmt.Errorf("unknown source type %q (want playlist|video)", s.Type)
+		return fmt.Errorf("unknown source type %q (want playlist|video|noise)", s.Type)
 	}
 	return nil
 }

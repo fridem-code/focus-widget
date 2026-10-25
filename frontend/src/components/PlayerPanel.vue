@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, useTemplateRef } from 'vue'
 import type { MusicPlayer } from '../lib/musicPlayer'
+import NoisePanel from './NoisePanel.vue'
 import PlayerError from './PlayerError.vue'
 import PlayerPlaceholder from './PlayerPlaceholder.vue'
 
@@ -12,12 +13,22 @@ onMounted(() => props.music.attach(host.value!))
 </script>
 
 <!-- The iframe lives in `host` once created and is only hidden (never covered)
-     while an error card takes its place (SPEC §2, §3.4). -->
+     while an error card or generated noise takes its place (SPEC §2, §3.4);
+     the music player keeps it paused then. -->
 <template>
   <div class="panel">
-    <div v-show="music.state.created && !music.state.error" ref="host" class="host"></div>
+    <div
+      v-show="music.state.created && !music.state.error && !music.state.generated"
+      ref="host"
+      class="host"
+    ></div>
+    <NoisePanel
+      v-if="music.state.generated"
+      :title="music.state.title"
+      :playing="music.state.playing"
+    />
     <PlayerError
-      v-if="music.state.error"
+      v-else-if="music.state.error"
       :kind="music.state.error"
       :code="music.state.errorCode"
       :genre-name="music.state.genreName"

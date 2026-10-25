@@ -171,8 +171,8 @@ function togglePlay() {
       <button
         class="icon-button"
         type="button"
-        aria-label="Следующее видео"
-        :disabled="!s.ready || !!s.error"
+        :aria-label="s.generated ? 'Следующий звук' : 'Следующее видео'"
+        :disabled="!s.generated && (!s.ready || !!s.error)"
         @click="music.nextTrack()"
       >
         <svg

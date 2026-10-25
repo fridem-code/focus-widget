@@ -91,15 +91,6 @@ describe('startMusicPolicy', () => {
     expect(music.setDuck).not.toHaveBeenCalledWith(20)
   })
 
-  it('mode switches go through the policy', () => {
-    const { music, runner } = setup()
-    music.state.wanted = true
-    runner.mode('compact', st(Phase.Focus, Status.Running))
-    expect(music.pause).toHaveBeenCalledOnce()
-    runner.mode('expanded', st(Phase.Focus, Status.Running))
-    expect(music.play).toHaveBeenCalledOnce()
-  })
-
   it('stop unsubscribes', () => {
     const { runner, offT, offS } = setup()
     runner.stop()

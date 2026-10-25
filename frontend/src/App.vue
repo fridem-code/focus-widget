@@ -51,7 +51,8 @@ const screen = ref<'timer' | 'settings'>('timer')
 /**
  * Whether the YouTube player can be seen. It can't in compact mode, in the
  * tray or behind the settings screen, and an unseen player must not play
- * (SPEC §2): the music policy treats all three like compact mode.
+ * (SPEC §2): the music player holds YouTube back while it is false. Generated
+ * noise plays regardless.
  */
 const playerShown = computed(() => visible.value && !compact.value && screen.value === 'timer')
 let policy: MusicPolicyRunner | undefined
@@ -90,11 +91,9 @@ onMounted(async () => {
   })
   stopPersist = persistMusic(music, MusicService)
   offEvents.push(connectPhaseSound(settings))
-  const runner = connectMusicPolicy(music, settings)
-  policy = runner
-  watch(playerShown, (shown) => {
-    if (state.value) runner.mode(shown ? 'expanded' : 'compact', state.value)
-  })
+  policy = connectMusicPolicy(music, settings)
+  // Immediate: a widget saved in compact mode starts with the player hidden.
+  watch(playerShown, (shown) => music.setShown(shown), { immediate: true })
 
   const wm = createWindowMode({
     initial: settings.window.mode === WindowMode.WindowCompact ? 'compact' : 'expanded',
@@ -104,10 +103,11 @@ onMounted(async () => {
       Events.On(WindowModeEvent, (ev) =>
         cb(ev.data === WindowMode.WindowCompact ? 'compact' : 'expanded'),
       ),
-    // Pause before the window shrinks; resuming after it grows is playerShown's job.
+    // Hold YouTube back before the window shrinks; resuming after it grows is
+    // playerShown's job.
     beforeCompact: () => {
       screen.value = 'timer'
-      if (state.value) runner.mode('compact', state.value)
+      music.setShown(false)
     },
     afterExpand: () => {},
   })
@@ -139,10 +139,10 @@ onUnmounted(() => {
 
 // Starting a focus phase plays synchronously inside the click handler, before
 // the round trip to Go (SPEC §5); the policy then confirms it on timer:transition.
-// A break may want silence and an unseen player must stay silent, so those are
-// left to the policy.
+// A break may want silence, so that is left to the policy; a hidden YouTube
+// player waits in the music player itself.
 function onStart() {
-  if (playerShown.value && state.value?.phase === Phase.Focus) music.play()
+  if (state.value?.phase === Phase.Focus) music.play()
   void start()
 }
 

@@ -36,6 +36,10 @@ func TestValidate(t *testing.T) {
 		wantErr string // empty means valid
 	}{
 		{"valid", Catalog{Genres: []Genre{{ID: "a", Name: "A", Sources: []Source{video, playlist}}}}, ""},
+		{"generated noise", Catalog{Genres: []Genre{{ID: "n", Name: "N", Sources: []Source{
+			{Type: SourceNoise, ID: "white"}, {Type: SourceNoise, ID: "rain"}}}}}, ""},
+		{"unknown noise", Catalog{Genres: []Genre{{ID: "n", Name: "N", Sources: []Source{{Type: SourceNoise, ID: "blue"}}}}},
+			`noise "blue" must be one of white|pink|brown|rain`},
 		{"no genres", Catalog{}, "no genres"},
 		{"empty id", Catalog{Genres: []Genre{{Name: "A", Sources: []Source{video}}}}, "empty id"},
 		{"duplicate id", Catalog{Genres: []Genre{

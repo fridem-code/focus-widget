@@ -1,4 +1,4 @@
-import type { State, Transition } from '../../bindings/focuswidget/internal/timer/models'
+import type { Transition } from '../../bindings/focuswidget/internal/timer/models'
 import type { MusicPlayer } from './musicPlayer'
 import {
   initialPolicyContext,
@@ -18,7 +18,7 @@ export interface PolicyRunnerDeps {
 }
 
 /**
- * Feeds timer transitions, mode switches and manual music presses through
+ * Feeds timer transitions and manual music presses through
  * musicPolicy and carries out its actions on the player.
  */
 export function startMusicPolicy(deps: PolicyRunnerDeps) {
@@ -49,8 +49,6 @@ export function startMusicPolicy(deps: PolicyRunnerDeps) {
   return {
     /** The user pressed play/pause on the music row. */
     user: (action: 'play' | 'pause') => handle({ kind: 'user', action }),
-    /** The window switched between expanded and compact (T9). */
-    mode: (mode: 'expanded' | 'compact', timer: State) => handle({ kind: 'mode', mode, timer }),
     context: () => context,
     stop() {
       offTransition()

@@ -189,3 +189,52 @@ describe('PlayerError', () => {
     expect(wrapper.get('.text').text()).toContain('«Lo-fi»')
   })
 })
+
+describe('MusicRow with generated noise', () => {
+  it('steps through the noises without a YouTube player', async () => {
+    const played: string[] = []
+    const noise = {
+      play: (k: string) => played.push(k),
+      stop: () => {},
+      setVolume: () => {},
+      playing: () => played.at(-1) ?? null,
+      dispose: () => {},
+    }
+    const music = createMusicPlayer({
+      factory: async () => fakePlayer(),
+      noise: noise as never,
+      isOnline: () => false, // no network needed
+      target: new EventTarget() as Window,
+    })
+    music.configure({
+      catalog: {
+        genres: [
+          {
+            id: 'gen',
+            name: 'Шум',
+            sources: [
+              { type: SourceType.SourceNoise, id: 'white', title: 'Белый шум' },
+              { type: SourceType.SourceNoise, id: 'brown', title: 'Коричневый шум' },
+            ],
+          },
+        ],
+      },
+      genreId: 'gen',
+      sourceIndex: 0,
+      volume: 60,
+      muted: false,
+      shuffle: true,
+    })
+    const wrapper = mount(MusicRow, { props: { music }, attachTo: document.body })
+    current = wrapper
+    expect(wrapper.get('.genre').text()).toBe('Шум · 1 / 2')
+    const next = btn(wrapper, 'Следующий звук')
+    expect(next.attributes('disabled')).toBeUndefined()
+
+    await btn(wrapper, 'Включить музыку').trigger('click')
+    await next.trigger('click')
+    expect(played).toEqual(['white', 'brown'])
+    expect(wrapper.get('.title').text()).toBe('Коричневый шум')
+    expect(wrapper.get('svg.note').attributes('aria-label')).toBe('Музыка играет')
+  })
+})

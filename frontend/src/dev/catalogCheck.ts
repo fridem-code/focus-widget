@@ -119,9 +119,9 @@ export function mountCatalogCheck() {
     if (!list?.length) {
       const catalog = await MusicService.Genres()
       list = (catalog.genres ?? []).flatMap((g) =>
-        (g.sources ?? []).map(
-          (s) => ({ genre: g.id, type: s.type, id: s.id, title: s.title }) as CheckSource,
-        ),
+        (g.sources ?? [])
+          .filter((s) => s.type !== 'noise') // generated in the page, nothing to check on YouTube
+          .map((s) => ({ genre: g.id, type: s.type, id: s.id, title: s.title }) as CheckSource),
       )
     }
     window.__catalogCheck = { done: false, results: [] }

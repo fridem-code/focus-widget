@@ -28,11 +28,12 @@
     },
     {
       "id": "noise",
-      "name": "Белый шум",
+      "name": "Шум",
       "sources": [
-        { "type": "video", "id": "nMfPqeZjc2c", "title": "White Noise Black Screen — 10 Hours" },
-        { "type": "video", "id": "yLOM8R6lbzg", "title": "Studying White Noise — 10 Hours" },
-        { "type": "video", "id": "9HeGgJSyVec", "title": "Super Deep Brown Noise — 10 Hours" }
+        { "type": "noise", "id": "white", "title": "Белый шум" },
+        { "type": "noise", "id": "pink", "title": "Розовый шум" },
+        { "type": "noise", "id": "brown", "title": "Коричневый шум" },
+        { "type": "noise", "id": "rain", "title": "Дождь" }
       ]
     }
   ]

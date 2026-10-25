@@ -311,3 +311,161 @@ it('dispose removes listeners and destroys the player', async () => {
   expect(music.state.error).toBeNull()
   expect(fake.calls.at(-1)).toBe('destroy')
 })
+
+describe('a hidden YouTube player (SPEC §2)', () => {
+  it('does not start while hidden and starts once shown', async () => {
+    const music = setup()
+    music.setShown(false)
+    music.play()
+    await flush()
+    expect(factory).not.toHaveBeenCalled()
+    expect(music.state.wanted).toBe(true)
+
+    music.setShown(true)
+    await flush()
+    handlers.onReady()
+    expect(fake.calls).toContain('loadVideo vid-aaaaaaa')
+  })
+
+  it('pauses when hidden, keeps the wish and resumes when shown', async () => {
+    const music = await started()
+    fake.calls = []
+    music.setShown(false)
+    expect(fake.calls).toEqual(['pause'])
+    expect(music.state.wanted).toBe(true)
+    music.setShown(true)
+    expect(fake.calls).toEqual(['pause', 'play'])
+  })
+
+  it('stays paused when shown if the music was paused meanwhile', async () => {
+    const music = await started()
+    music.setShown(false)
+    music.pause()
+    fake.calls = []
+    music.setShown(true)
+    expect(fake.calls).toEqual([])
+  })
+})
+
+class FakeNoise {
+  kind: string | null = null
+  volume = -1
+  log: string[] = []
+  play = (k: string) => {
+    this.kind = k
+    this.log.push(`play ${k}`)
+  }
+  stop = () => {
+    if (this.kind) this.log.push('stop')
+    this.kind = null
+  }
+  setVolume = (v: number) => {
+    this.volume = v
+  }
+  playing = () => this.kind
+  dispose = () => {}
+}
+
+describe('generated noise (T17)', () => {
+  const noiseSource = (id: string) => ({ type: SourceType.SourceNoise, id, title: id })
+  const withNoise: Catalog = {
+    genres: [
+      { id: 'gen', name: 'Шум', sources: [noiseSource('white'), noiseSource('rain')] },
+      ...catalog.genres!,
+    ],
+  }
+  let noise: FakeNoise
+
+  function setupNoise(over: Partial<MusicConfig> = {}) {
+    noise = new FakeNoise()
+    const music = createMusicPlayer({
+      factory: factory as never,
+      noise: noise as never,
+      isOnline: () => online,
+      target: target as Window,
+    })
+    music.configure(config({ catalog: withNoise, genreId: 'gen', ...over }))
+    music.attach(document.createElement('div'))
+    return music
+  }
+
+  it('plays without creating the YouTube player', async () => {
+    const music = setupNoise()
+    expect(music.state.generated).toBe(true)
+    music.play()
+    await flush()
+    expect(noise.kind).toBe('white')
+    expect(music.state.playing).toBe(true)
+    expect(factory).not.toHaveBeenCalled()
+    music.pause()
+    expect(noise.kind).toBeNull()
+    expect(music.state.playing).toBe(false)
+  })
+
+  it('keeps playing while the player is hidden and offline', () => {
+    const music = setupNoise()
+    music.play()
+    music.setShown(false)
+    target.dispatchEvent(new Event('offline'))
+    expect(noise.kind).toBe('white')
+    expect(music.state.error).toBeNull()
+  })
+
+  it('steps through the noises with next track', () => {
+    const music = setupNoise()
+    music.play()
+    music.nextTrack()
+    expect(noise.kind).toBe('rain')
+    expect(music.state.title).toBe('rain')
+    music.nextTrack()
+    expect(noise.kind).toBe('white')
+  })
+
+  it('follows the volume, mute and duck', () => {
+    const music = setupNoise({ volume: 40 })
+    expect(noise.volume).toBeCloseTo(0.4)
+    music.setDuck(20)
+    expect(noise.volume).toBeCloseTo(0.2)
+    music.setMuted(true)
+    expect(noise.volume).toBe(0)
+  })
+
+  it('hands over to YouTube on a genre switch, which waits while hidden', async () => {
+    const music = setupNoise()
+    music.play()
+    music.setShown(false)
+    music.selectGenre('lofi')
+    expect(noise.kind).toBeNull()
+    expect(music.state.playing).toBe(false)
+    expect(music.state.generated).toBe(false)
+    await flush()
+    expect(factory).not.toHaveBeenCalled()
+    music.setShown(true)
+    await flush()
+    handlers.onReady()
+    expect(fake.calls).toContain('loadPlaylist PL-lofi')
+  })
+
+  it('takes over from a playing YouTube player and ignores its events', async () => {
+    noise = new FakeNoise()
+    const music = createMusicPlayer({
+      factory: factory as never,
+      noise: noise as never,
+      isOnline: () => online,
+      target: target as Window,
+    })
+    music.configure(config({ catalog: withNoise, genreId: 'noise' }))
+    music.attach(document.createElement('div'))
+    music.play()
+    await flush()
+    handlers.onReady()
+    handlers.onStateChange(YTState.Playing)
+    fake.calls = []
+
+    music.selectGenre('gen')
+    expect(fake.calls).toEqual(['pause'])
+    expect(noise.kind).toBe('white')
+    handlers.onStateChange(YTState.Paused) // the iframe reports its pause
+    expect(music.state.playing).toBe(true)
+  })
+})
