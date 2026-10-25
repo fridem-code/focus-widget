@@ -5,10 +5,13 @@ package app
 import (
 	"fmt"
 	"io/fs"
+	"os"
+	"slices"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 
+	"focuswidget/internal/autostart"
 	"focuswidget/internal/catalog"
 	"focuswidget/internal/config"
 	"focuswidget/internal/foreground"
@@ -57,11 +60,20 @@ func New(assets fs.FS) (*application.App, error) {
 	// Registers the app with Windows (HKCU AppUserModelId + COM activator) on
 	// startup; T13's uninstaller removes those keys (docs/spike-results.md §6).
 	toasts := notifications.New()
+	// Started by Windows: the first show keeps the focus where it is (T19).
+	var quietShow func(show func())
+	if slices.Contains(os.Args[1:], autostart.Flag) {
+		quietShow = foreground.Keep
+	}
 	windowService := services.NewWindowService(settingsService, emitter,
 		func() services.Window { return mainWindow },
 		func() []*application.Screen { return wailsApp.Screen.GetAll() },
 		func() { wailsApp.Quit() },
-		windowGlass{window: func() *application.WebviewWindow { return mainWindow }, logger: logger})
+		windowGlass{window: func() *application.WebviewWindow { return mainWindow }, logger: logger},
+		quietShow)
+	autostartService := services.NewAutostartService(autostart.New(), func(err error) {
+		logger.Warn("refresh autostart", "err", err)
+	})
 	wailsApp = application.New(application.Options{
 		Name:         name,
 		Description:  description,
@@ -77,6 +89,7 @@ func New(assets fs.FS) (*application.App, error) {
 			application.NewService(settingsService),
 			application.NewService(services.NewMusicService(genres, settingsService)),
 			application.NewService(windowService),
+			application.NewService(autostartService),
 			application.NewService(toasts),
 		},
 		Assets: application.AssetOptions{

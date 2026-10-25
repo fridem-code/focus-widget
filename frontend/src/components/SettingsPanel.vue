@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import type { Genre } from '../../bindings/focuswidget/internal/catalog/models'
 import {
   BreakBehavior,
@@ -18,6 +18,8 @@ const props = defineProps<{
   genreId: string
   /** Saves the changed fields; resolves to an error message if rejected. */
   save: (patch: SettingsPatch) => Promise<string | null>
+  /** Starting with Windows (T19): kept by Windows, not in the settings. */
+  autostart: { enabled: () => Promise<boolean>; set: (on: boolean) => Promise<void> }
 }>()
 const emit = defineEmits<{
   back: []
@@ -28,6 +30,23 @@ const emit = defineEmits<{
 }>()
 
 const saveError = ref<string | null>(null)
+
+// Read every time the screen opens: Task Manager can switch it too. Hidden
+// until known, so it never shows a wrong state.
+const autostartOn = ref<boolean | null>(null)
+onMounted(async () => {
+  autostartOn.value = await props.autostart.enabled().catch(() => null)
+})
+
+async function setAutostart(on: boolean) {
+  try {
+    await props.autostart.set(on)
+    autostartOn.value = on
+    saveError.value = null
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : String(err)
+  }
+}
 
 async function set(patch: SettingsPatch) {
   saveError.value = await props.save(patch)
@@ -179,6 +198,12 @@ const sessions = (n: number) => plural(n, 'сессия', 'сессии', 'се�
           label="Всегда поверх окон"
           :value="settings.window.alwaysOnTop"
           @toggle="emit('alwaysOnTop', $event)"
+        />
+        <SettingSwitch
+          v-if="autostartOn !== null"
+          label="Запускать вместе с Windows"
+          :value="autostartOn"
+          @toggle="setAutostart"
         />
         <SettingSegmented
           label="Тема"

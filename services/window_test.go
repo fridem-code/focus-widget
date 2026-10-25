@@ -89,7 +89,7 @@ func newWindowService(t *testing.T, screens ...*application.Screen) (*WindowServ
 	settings, _, _, emit := newSettingsService(t)
 	win := &fakeWindow{bounds: application.Rect{X: 100, Y: 50, Width: ExpandedWidth, Height: ExpandedHeight}}
 	svc := NewWindowService(settings, emit, func() Window { return win },
-		func() []*application.Screen { return screens }, func() { win.quits++ }, &fakeGlass{on: true})
+		func() []*application.Screen { return screens }, func() { win.quits++ }, &fakeGlass{on: true}, nil)
 	return svc, win, settings, emit
 }
 
@@ -332,5 +332,28 @@ func TestGlassGoesOnBeforeTheWindowShows(t *testing.T) {
 	}
 	if on := svc.SetGlass(false); !on || glass.applied[1] {
 		t.Fatalf("SetGlass(false) = %v, applied = %v", on, glass.applied)
+	}
+}
+
+// T19: started by Windows, the window shows without taking the focus; later
+// shows (from the tray) focus it as usual.
+func TestQuietStartDoesNotTakeTheFocus(t *testing.T) {
+	quiet := 0
+	settings, _, _, emit := newSettingsService(t)
+	win := &fakeWindow{}
+	svc := NewWindowService(settings, emit, func() Window { return win },
+		func() []*application.Screen { return nil }, func() {}, &fakeGlass{},
+		func(show func()) { quiet++; show() })
+	if err := svc.ServiceStartup(context.Background(), application.ServiceOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	win.fire(events.Common.WindowRuntimeReady)
+	if quiet != 1 || !win.shown || win.focused != 0 || !svc.Visible() {
+		t.Fatalf("quiet start: quiet=%d shown=%v focused=%d visible=%v", quiet, win.shown, win.focused, svc.Visible())
+	}
+	svc.Hide()
+	svc.Show()
+	if win.focused != 1 {
+		t.Fatalf("Show from the tray focused %d times, want 1", win.focused)
 	}
 }

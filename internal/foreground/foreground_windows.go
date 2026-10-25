@@ -7,6 +7,7 @@ package foreground
 import (
 	"fmt"
 	"runtime"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -26,12 +27,15 @@ const (
 var hwndTopmost = ^uintptr(0) // (HWND)-1
 
 var (
-	user32                = windows.NewLazySystemDLL("user32.dll")
-	procSetWinEventHook   = user32.NewProc("SetWinEventHook")
-	procUnhookWinEvent    = user32.NewProc("UnhookWinEvent")
-	procGetMessage        = user32.NewProc("GetMessageW")
-	procPostThreadMessage = user32.NewProc("PostThreadMessageW")
-	procSetWindowPos      = user32.NewProc("SetWindowPos")
+	user32                       = windows.NewLazySystemDLL("user32.dll")
+	procSetWinEventHook          = user32.NewProc("SetWinEventHook")
+	procUnhookWinEvent           = user32.NewProc("UnhookWinEvent")
+	procGetMessage               = user32.NewProc("GetMessageW")
+	procPostThreadMessage        = user32.NewProc("PostThreadMessageW")
+	procSetWindowPos             = user32.NewProc("SetWindowPos")
+	procGetForeground            = user32.NewProc("GetForegroundWindow")
+	procSetForeground            = user32.NewProc("SetForegroundWindow")
+	procGetWindowThreadProcessID = user32.NewProc("GetWindowThreadProcessId")
 )
 
 // msg mirrors the Win32 MSG structure; only its size matters here.
@@ -89,4 +93,34 @@ func Pin(hwnd uintptr) error {
 		return fmt.Errorf("SetWindowPos: %w", err)
 	}
 	return nil
+}
+
+// Keep runs show and hands the keyboard focus back to the window that had it.
+// Showing a window activates it, so a widget started by Windows (T19) would
+// otherwise take the focus from what the user is doing. While this process is
+// in the foreground Windows lets it pass the focus on. WebView2 can take the
+// focus again a moment after the show, so it is handed back once more later,
+// unless the user has moved on to another app by then.
+func Keep(show func()) {
+	prev, _, _ := procGetForeground.Call()
+	show()
+	if prev == 0 || ownedByUs(prev) {
+		return
+	}
+	giveBack := func() {
+		if cur, _, _ := procGetForeground.Call(); cur != prev && ownedByUs(cur) {
+			_, _, _ = procSetForeground.Call(prev)
+		}
+	}
+	giveBack()
+	time.AfterFunc(keepRetry, giveBack)
+}
+
+// keepRetry: when WebView2 has usually finished taking the focus after a show.
+const keepRetry = 600 * time.Millisecond
+
+func ownedByUs(hwnd uintptr) bool {
+	var pid uint32
+	_, _, _ = procGetWindowThreadProcessID.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+	return pid == windows.GetCurrentProcessId()
 }

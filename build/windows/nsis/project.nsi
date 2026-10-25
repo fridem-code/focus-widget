@@ -14,7 +14,8 @@
     !define WAILS_INSTALL_SCOPE "user"
 !endif
 !define INFO_COPYRIGHT "(c) 2026 Focus Widget"
-## The name the toast service registers under (app.New's Options.Name).
+## The name the toast service registers under (app.New's Options.Name); also
+## the autostart Run value (internal/autostart ValueName).
 !define TOAST_APP_ID "Focus Widget"
 !define DATA_DIR "$APPDATA\FocusWidget"
 
@@ -134,6 +135,8 @@ Section "uninstall"
         Delete "$1"
     ${EndIf}
     DeleteRegKey HKCU "Software\Classes\AppUserModelId\${TOAST_APP_ID}"
+    # Starting with Windows (T19; internal/autostart ValueName).
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${TOAST_APP_ID}"
     DeleteRegKey HKCU "Software\${TOAST_APP_ID}\NotificationCategories"
     DeleteRegKey /ifempty HKCU "Software\${TOAST_APP_ID}"
 

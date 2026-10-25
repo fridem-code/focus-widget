@@ -156,7 +156,7 @@ func TestTrayFollowsEventsWithoutDeadlock(t *testing.T) {
 	settings := NewSettingsService(store, config.Default(), tm, emitter)
 	win := &fakeWindow{}
 	window := NewWindowService(settings, emitter, func() Window { return win },
-		func() []*application.Screen { return nil }, func() {}, &fakeGlass{})
+		func() []*application.Screen { return nil }, func() {}, &fakeGlass{}, nil)
 	tray := NewTray(tm, settings, window, emitter)
 	emitter.Tray = tray
 	ui, onTop := &fakeTrayUI{}, &fakeItem{}

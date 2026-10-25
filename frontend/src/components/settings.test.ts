@@ -59,10 +59,19 @@ function mountPanel(initial = settings(), result: string | null = null) {
     saved.push(patch)
     return result
   })
+  const autostart = {
+    on: false,
+    fail: false,
+    enabled: vi.fn(async () => autostart.on),
+    set: vi.fn(async (on: boolean) => {
+      if (autostart.fail) throw new Error('access denied')
+      autostart.on = on
+    }),
+  }
   const wrapper = mount(SettingsPanel, {
-    props: { settings: initial, genres, genreId: 'lofi', save },
+    props: { settings: initial, genres, genreId: 'lofi', save, autostart },
   })
-  return { wrapper, saved, save }
+  return { wrapper, saved, save, autostart }
 }
 
 const flush = () => new Promise((r) => setTimeout(r))
@@ -189,6 +198,33 @@ describe('SettingsPanel', () => {
     await flush()
     await nextTick()
     expect(wrapper.get('.save-error').text()).toContain('out of range')
+  })
+
+  it('reads autostart from Windows and switches it', async () => {
+    const { wrapper, autostart } = mountPanel()
+    expect(wrapper.text()).not.toContain('Запускать вместе с Windows') // until known
+    await flush()
+    await nextTick()
+    const sw = switchButton(wrapper, 'Запускать вместе с Windows')
+    expect(sw.attributes('aria-checked')).toBe('false')
+    await sw.trigger('click')
+    await flush()
+    expect(autostart.set).toHaveBeenCalledWith(true)
+    expect(sw.attributes('aria-checked')).toBe('true')
+  })
+
+  it('shows a failed autostart switch', async () => {
+    const { wrapper, autostart } = mountPanel()
+    autostart.fail = true
+    await flush()
+    await nextTick()
+    await switchButton(wrapper, 'Запускать вместе с Windows').trigger('click')
+    await flush()
+    await nextTick()
+    expect(wrapper.get('.save-error').text()).toContain('access denied')
+    expect(switchButton(wrapper, 'Запускать вместе с Windows').attributes('aria-checked')).toBe(
+      'false',
+    )
   })
 
   it('shows «сессий» in the right form', async () => {

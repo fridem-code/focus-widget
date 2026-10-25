@@ -9,6 +9,7 @@ import {
 import { WindowMode } from '../bindings/focuswidget/internal/config/models'
 import { Phase } from '../bindings/focuswidget/internal/timer/models'
 import {
+  AutostartService,
   MusicService,
   SettingsService,
   TimerService,
@@ -58,6 +59,11 @@ const playerShown = computed(() => visible.value && !compact.value && screen.val
 let policy: MusicPolicyRunner | undefined
 let stopPersist: (() => void) | undefined
 const offEvents: (() => void)[] = []
+// Starting with Windows, for the settings screen (T19).
+const autostart = {
+  enabled: () => AutostartService.Enabled(),
+  set: (on: boolean) => AutostartService.Set(on),
+}
 
 onMounted(async () => {
   const [catalog, settings] = await Promise.all([MusicService.Genres(), SettingsService.Get()])
@@ -195,6 +201,7 @@ function setAlwaysOnTop(on: boolean) {
       :genres="music.genres()"
       :genre-id="music.state.genreId"
       :save="store.patch"
+      :autostart="autostart"
       @back="screen = 'timer'"
       @hide="WindowService.Hide()"
       @genre="music.selectGenre($event)"

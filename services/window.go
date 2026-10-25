@@ -64,6 +64,9 @@ type WindowService struct {
 	screens  func() []*application.Screen
 	quit     func()
 	glass    Glass
+	// quietShow is set when Windows started the widget (autostart, T19): it
+	// shows the window the first time without taking the focus.
+	quietShow func(show func())
 
 	mu        sync.Mutex
 	saveTimer *time.Timer
@@ -72,8 +75,9 @@ type WindowService struct {
 }
 
 func NewWindowService(settings *SettingsService, emit Emitter, window func() Window,
-	screens func() []*application.Screen, quit func(), glass Glass) *WindowService {
-	return &WindowService{settings: settings, emit: emit, window: window, screens: screens, quit: quit, glass: glass}
+	screens func() []*application.Screen, quit func(), glass Glass, quietShow func(show func())) *WindowService {
+	return &WindowService{settings: settings, emit: emit, window: window, screens: screens, quit: quit,
+		glass: glass, quietShow: quietShow}
 }
 
 // SetGlass turns the glass on for the theme the page shows and reports
@@ -119,11 +123,20 @@ func (s *WindowService) ServiceStartup(context.Context, application.ServiceOptio
 	var shown sync.Once
 	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
 		shown.Do(func() {
-			s.place()
-			// Before showing: a window without its glass is black until the
-			// page has asked for it.
-			s.glass.Apply(s.themeDark())
-			s.Show()
+			reveal := func() {
+				s.place() // moving the window can already activate it
+				// Before showing: a window without its glass is black until
+				// the page has asked for it.
+				s.glass.Apply(s.themeDark())
+				win.Show()
+			}
+			if s.quietShow != nil {
+				s.quietShow(reveal)
+			} else {
+				reveal()
+				win.Focus()
+			}
+			s.setVisible(true)
 		})
 	})
 	return nil
