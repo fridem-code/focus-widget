@@ -62,9 +62,10 @@ func New(assets fs.FS) (*application.App, error) {
 		func() []*application.Screen { return wailsApp.Screen.GetAll() },
 		func() { wailsApp.Quit() })
 	wailsApp = application.New(application.Options{
-		Name:        name,
-		Description: description,
-		Logger:      wailsLogger,
+		Name:         name,
+		Description:  description,
+		Logger:       wailsLogger,
+		ErrorHandler: wailsErrorHandler(wailsLogger),
 		// A second launch exits and brings the running widget's window back (SPEC §3.9).
 		SingleInstance: &application.SingleInstanceOptions{
 			UniqueID:               "com.focuswidget.app",

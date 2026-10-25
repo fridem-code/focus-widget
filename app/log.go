@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 
 	"focuswidget/internal/logfile"
 )
@@ -44,4 +45,30 @@ func newLoggers(dir string) (logger, wailsLogger *slog.Logger) {
 		_ = f.Close() // SetCrashOutput keeps its own duplicate
 	}
 	return logger, wailsLogger
+}
+
+// harmlessWailsErrors start the Wails errors that break nothing. Logged at
+// Debug, so that ERROR in app.log means a real problem.
+var harmlessWailsErrors = []string{
+	// On every target WebView2 auto-attaches (the YouTube iframe's workers)
+	// Wails enables request cancellation over DevTools; WebView2 rejects that
+	// for some targets ("The parameter is incorrect"), and Wails then resumes
+	// the target anyway. Our asset requests do not come from those targets
+	// (docs/BUGS.md B3, Wails pkg/application/request_cancellation_windows.go).
+	"Worker request cancellation setup:",
+}
+
+// wailsErrorHandler is Options.ErrorHandler: Wails' internal errors go to the
+// log, the known harmless ones at Debug.
+func wailsErrorHandler(logger *slog.Logger) func(error) {
+	return func(err error) {
+		msg := err.Error()
+		for _, prefix := range harmlessWailsErrors {
+			if strings.HasPrefix(msg, prefix) {
+				logger.Debug(msg)
+				return
+			}
+		}
+		logger.Error(msg)
+	}
 }
