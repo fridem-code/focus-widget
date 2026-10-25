@@ -8,7 +8,7 @@ import {
   type Transition,
 } from '../../bindings/focuswidget/internal/timer/models'
 import type { PolicySettings } from './musicPolicy'
-import type { MusicPlayer } from './musicPlayer'
+import { FADE_OUT_MS, QUICK_FADE_MS, type MusicPlayer } from './musicPlayer'
 import { startMusicPolicy } from './policyRunner'
 
 const st = (phase: Phase, status: Status): State => ({
@@ -53,15 +53,15 @@ describe('startMusicPolicy', () => {
   it('runs a full cycle: focus plays, break ducks, focus restores', () => {
     const { music, transition } = setup()
     transition([Phase.Focus, Status.Idle], [Phase.Focus, Status.Running], Cause.CauseStart)
-    expect(music.setDuck).toHaveBeenLastCalledWith(null)
+    expect(music.setDuck).toHaveBeenLastCalledWith(null, { glide: true })
     expect(music.play).toHaveBeenCalledOnce()
 
     transition([Phase.Focus, Status.Running], [Phase.ShortBreak, Status.Running], Cause.CauseExpire)
-    expect(music.setDuck).toHaveBeenLastCalledWith(20)
+    expect(music.setDuck).toHaveBeenLastCalledWith(20, { glide: true })
     expect(music.pause).not.toHaveBeenCalled()
 
     transition([Phase.ShortBreak, Status.Running], [Phase.Focus, Status.Running], Cause.CauseExpire)
-    expect(music.setDuck).toHaveBeenLastCalledWith(null)
+    expect(music.setDuck).toHaveBeenLastCalledWith(null, { glide: true })
     expect(music.play).toHaveBeenCalledTimes(2)
   })
 
@@ -96,5 +96,27 @@ describe('startMusicPolicy', () => {
     runner.stop()
     expect(offT).toHaveBeenCalledOnce()
     expect(offS).toHaveBeenCalledOnce()
+  })
+})
+
+describe('fades (T18)', () => {
+  it('fades long when a focus runs out, quickly on a timer pause, and glides ducks', () => {
+    const { music, transition } = setup(BreakBehavior.BreakPause)
+    transition([Phase.Focus, Status.Idle], [Phase.Focus, Status.Running], Cause.CauseStart)
+    expect(music.play).toHaveBeenLastCalledWith({ fade: true })
+    expect(music.setDuck).toHaveBeenLastCalledWith(null, { glide: true })
+
+    transition([Phase.Focus, Status.Running], [Phase.Focus, Status.Paused], Cause.CausePause)
+    expect(music.pause).toHaveBeenLastCalledWith({ fadeMs: QUICK_FADE_MS })
+
+    music.state.wanted = true
+    transition([Phase.Focus, Status.Running], [Phase.ShortBreak, Status.Running], Cause.CauseExpire)
+    expect(music.pause).toHaveBeenLastCalledWith({ fadeMs: FADE_OUT_MS })
+  })
+
+  it('glides into «Тише»', () => {
+    const { music, transition } = setup(BreakBehavior.BreakDuck)
+    transition([Phase.Focus, Status.Running], [Phase.ShortBreak, Status.Running], Cause.CauseExpire)
+    expect(music.setDuck).toHaveBeenLastCalledWith(20, { glide: true })
   })
 })

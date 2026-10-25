@@ -43,6 +43,20 @@ export interface MusicDeps {
  */
 const MAX_PLAYLIST_ERRORS = 5
 
+/**
+ * Fades (T18): what the timer does to the music glides; what the user does
+ * on the music row is immediate. A fade-in starts once sound actually starts
+ * (YouTube may load for a while first).
+ */
+export const FADE_IN_MS = 1500
+/** End of a focus phase. */
+export const FADE_OUT_MS = 2500
+/** Timer pause, reset and skip: soft, but still prompt. */
+export const QUICK_FADE_MS = 400
+/** Into and out of «Тише». */
+export const DUCK_GLIDE_MS = 1500
+const GLIDE_STEP_MS = 50
+
 export function createMusicPlayer(deps: MusicDeps = {}) {
   const factory = deps.factory ?? createYouTubePlayer
   const noise = deps.noise ?? createNoise()
@@ -82,6 +96,13 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
   let broken = new Set<number>() // sources of the current genre that failed this session
   let playlistErrors = 0
   let playlistConfigured = false
+  /** The volume being output (0…100); fades move it, settings set it. */
+  let heard = 0
+  let glideTimer: ReturnType<typeof setInterval> | null = null
+  /** A fade-out runs; the music pauses when it ends. */
+  let fadingOut = false
+  /** play({ fade }) came; the fade-in starts when the sound does. */
+  let fadeInPending = false
 
   const genre = () => resolveGenre(catalog, state.genreId)
   const source = () => genre()?.sources?.[state.sourceIndex]
@@ -111,6 +132,7 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     if (state.generated && state.wanted) {
       noise.play(source()!.id as NoiseKind)
       state.playing = true
+      startFadeIn()
     } else {
       noise.stop()
       if (state.generated) state.playing = false
@@ -183,16 +205,72 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     loadCurrent()
   }
 
-  /** The volume heard: the user's, capped by a duck, or silence when muted. */
-  const effectiveVolume = () =>
+  /** The volume to hear: the user's, capped by a duck (mute is separate). */
+  const targetVolume = () =>
     state.duck === null ? state.volume : Math.min(state.duck, state.volume)
 
-  function applyVolume() {
-    noise.setVolume(state.muted ? 0 : effectiveVolume() / 100)
+  /** Sends a volume to what plays: the noise gain and the YouTube player. */
+  function output(v: number) {
+    heard = v
+    noise.setVolume(state.muted ? 0 : v / 100)
+    if (player && state.ready) player.setVolume(Math.round(v))
+  }
+
+  function applyMute() {
     if (!player || !state.ready) return
-    player.setVolume(effectiveVolume())
     if (state.muted) player.mute()
     else player.unMute()
+  }
+
+  function stopGlide() {
+    if (glideTimer !== null) clearInterval(glideTimer)
+    glideTimer = null
+  }
+
+  /** Moves the volume being output to `to` in steps over `ms`, then calls `done`. */
+  function glideTo(to: number, ms: number, done?: () => void) {
+    stopGlide()
+    const from = heard
+    const steps = Math.round(ms / GLIDE_STEP_MS)
+    if (steps < 1 || from === to) {
+      output(to)
+      done?.()
+      return
+    }
+    let i = 0
+    glideTimer = setInterval(() => {
+      i++
+      output(from + ((to - from) * i) / steps)
+      if (i >= steps) {
+        stopGlide()
+        done?.()
+      }
+    }, GLIDE_STEP_MS)
+  }
+
+  function startFadeIn() {
+    if (!fadeInPending) return
+    fadeInPending = false
+    glideTo(targetVolume(), FADE_IN_MS)
+  }
+
+  /** The volume settings changed: heard at once, unless a fade is in charge. */
+  function applyVolume() {
+    if (fadingOut || fadeInPending) {
+      output(heard) // the fade goes on
+    } else {
+      stopGlide()
+      output(targetVolume())
+    }
+    applyMute()
+  }
+
+  /** Pauses whatever plays, now. */
+  function stopNow() {
+    fadingOut = false
+    stopGlide()
+    player?.pauseVideo()
+    syncNoise()
   }
 
   function updateTrackInfo() {
@@ -218,6 +296,10 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     if (!player || state.generated) return
     if (s === YTState.Playing) {
       state.playing = true
+      // A pending fade-in starts now; otherwise make sure it is not left at
+      // a faded-out level (e.g. play pressed in the YouTube controls).
+      if (fadeInPending) startFadeIn()
+      else if (!fadingOut && glideTimer === null) output(targetVolume())
       playlistErrors = 0
       if (state.error !== 'config') clearError()
       if (source()?.type === SourceType.SourcePlaylist && !playlistConfigured) {
@@ -301,17 +383,42 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
       if (youTubeAudible()) void ensurePlayer()
     },
 
-    play() {
+    /**
+     * Wants music. With `fade` (the timer starting it) it rises from silence
+     * once it sounds; otherwise (the user's press) it plays at its volume.
+     * Playing again while it plays changes nothing; during a fade-out it
+     * rises back instead of stopping.
+     */
+    play(opts: { fade?: boolean } = {}) {
+      if (fadingOut) {
+        fadingOut = false
+        state.wanted = true
+        glideTo(targetVolume(), FADE_IN_MS)
+        return
+      }
+      const already = state.wanted && !state.error
       state.wanted = true
+      if (!already) {
+        stopGlide()
+        fadeInPending = !!opts.fade
+        output(opts.fade ? 0 : targetVolume())
+      }
       if (!state.configured) return // configure() starts it
       if (state.generated) return syncNoise()
       if (state.shown) playYouTube()
     },
 
-    pause() {
+    /**
+     * Stops wanting music. With `fadeMs` (the timer stopping it) audible
+     * music fades out over that long first; otherwise it pauses now.
+     */
+    pause(opts: { fadeMs?: number } = {}) {
+      fadeInPending = false
       state.wanted = false
-      player?.pauseVideo()
-      syncNoise()
+      if (!opts.fadeMs || !state.playing) return stopNow()
+      if (fadingOut) return // already on its way out
+      fadingOut = true
+      glideTo(0, opts.fadeMs, stopNow)
     },
 
     /**
@@ -379,15 +486,21 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     /**
      * Plays at most `volume` until called with null, without touching the
      * user's volume. Ducking never makes music louder than the user set it.
+     * With `glide`, audible music slides to the new level.
      */
-    setDuck(volume: number | null) {
+    setDuck(volume: number | null, opts: { glide?: boolean } = {}) {
       state.duck = volume === null ? null : Math.min(100, Math.max(0, Math.round(volume)))
-      applyVolume()
+      if (opts.glide && state.playing && !fadingOut && !fadeInPending) {
+        glideTo(targetVolume(), DUCK_GLIDE_MS)
+      } else {
+        applyVolume()
+      }
     },
 
     retry,
 
     dispose() {
+      stopGlide()
       target.removeEventListener('offline', onOffline)
       target.removeEventListener('online', onOnline)
       noise.dispose()

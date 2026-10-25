@@ -142,7 +142,7 @@ onUnmounted(() => {
 // A break may want silence, so that is left to the policy; a hidden YouTube
 // player waits in the music player itself.
 function onStart() {
-  if (state.value?.phase === Phase.Focus) music.play()
+  if (state.value?.phase === Phase.Focus) music.play({ fade: true })
   void start()
 }
 

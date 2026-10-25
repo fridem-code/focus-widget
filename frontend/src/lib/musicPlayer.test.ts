@@ -1,6 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SourceType, type Catalog } from '../../bindings/focuswidget/internal/catalog/models'
-import { createMusicPlayer, type MusicConfig } from './musicPlayer'
+import {
+  createMusicPlayer,
+  DUCK_GLIDE_MS,
+  FADE_IN_MS,
+  FADE_OUT_MS,
+  type MusicConfig,
+} from './musicPlayer'
 import { YTState, type YTHandlers, type YTPlayer } from './youtube'
 
 class FakePlayer implements YTPlayer {
@@ -467,5 +473,77 @@ describe('generated noise (T17)', () => {
     expect(noise.kind).toBe('white')
     handlers.onStateChange(YTState.Paused) // the iframe reports its pause
     expect(music.state.playing).toBe(true)
+  })
+})
+
+describe('fades (T18)', () => {
+  afterEach(() => vi.useRealTimers())
+
+  const volumes = () => fake.calls.filter((c) => c.startsWith('volume')).map((c) => +c.slice(7))
+
+  it('a faded play rises from silence once YouTube plays', async () => {
+    const music = setup()
+    music.play({ fade: true })
+    await flush()
+    vi.useFakeTimers()
+    handlers.onReady()
+    expect(volumes().at(-1)).toBe(0) // loading, silent
+    handlers.onStateChange(YTState.Playing)
+    vi.advanceTimersByTime(FADE_IN_MS / 2)
+    expect(volumes().at(-1)).toBeGreaterThan(10)
+    expect(volumes().at(-1)).toBeLessThan(30)
+    vi.advanceTimersByTime(FADE_IN_MS)
+    expect(volumes().at(-1)).toBe(40)
+  })
+
+  it('a faded pause keeps playing while it fades, then pauses', async () => {
+    const music = await started()
+    handlers.onStateChange(YTState.Playing)
+    vi.useFakeTimers()
+    fake.calls = []
+    music.pause({ fadeMs: FADE_OUT_MS })
+    expect(music.state.wanted).toBe(false)
+    expect(fake.calls).not.toContain('pause')
+    vi.advanceTimersByTime(FADE_OUT_MS)
+    expect(volumes().at(-1)).toBe(0)
+    expect(fake.calls.at(-1)).toBe('pause')
+  })
+
+  it('playing during a fade-out rises back instead of pausing', async () => {
+    const music = await started()
+    handlers.onStateChange(YTState.Playing)
+    vi.useFakeTimers()
+    music.pause({ fadeMs: FADE_OUT_MS })
+    vi.advanceTimersByTime(FADE_OUT_MS / 2)
+    fake.calls = []
+    music.play({ fade: true })
+    vi.advanceTimersByTime(FADE_IN_MS)
+    expect(fake.calls).not.toContain('pause')
+    expect(volumes().at(-1)).toBe(40)
+    expect(music.state.wanted).toBe(true)
+  })
+
+  it('the user’s pause and play are immediate', async () => {
+    const music = await started()
+    handlers.onStateChange(YTState.Playing)
+    fake.calls = []
+    music.pause()
+    expect(fake.calls).toEqual(['pause'])
+    music.play()
+    expect(volumes().at(-1)).toBe(40)
+  })
+
+  it('a duck glides and the volume slider cuts a glide short', async () => {
+    const music = await started()
+    handlers.onStateChange(YTState.Playing)
+    vi.useFakeTimers()
+    music.setDuck(10, { glide: true })
+    vi.advanceTimersByTime(DUCK_GLIDE_MS / 2)
+    expect(volumes().at(-1)).toBeGreaterThan(10)
+    expect(volumes().at(-1)).toBeLessThan(40)
+    music.setVolume(30) // the user moves the slider: at once, still under the duck
+    expect(volumes().at(-1)).toBe(10)
+    vi.advanceTimersByTime(DUCK_GLIDE_MS)
+    expect(volumes().at(-1)).toBe(10)
   })
 })
