@@ -150,7 +150,7 @@ func TestTrayAttachShowsStateAndRefreshOnlyOnChange(t *testing.T) {
 // The app wires the tray to every emitted event. SettingsService emits while
 // holding its lock and the tray reads settings: this must not deadlock.
 func TestTrayFollowsEventsWithoutDeadlock(t *testing.T) {
-	store := config.NewStore(t.TempDir(), slog.New(slog.DiscardHandler))
+	store := config.NewStore(storeDir(t), slog.New(slog.DiscardHandler))
 	tm := newTimer(t, config.Default().Timer)
 	emitter := &TrayEmitter{Emitter: &fakeEmitter{}}
 	settings := NewSettingsService(store, config.Default(), tm, emitter)

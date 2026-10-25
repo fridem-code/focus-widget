@@ -151,17 +151,24 @@ func (s *WindowService) ServiceShutdown() error {
 
 func (s *WindowService) Mode() config.WindowMode { return s.settings.Get().Window.Mode }
 
-// SetMode resizes the window around its top-left corner, remembers the mode
-// and announces it as window:mode (the music policy reacts to it).
+// SetMode resizes the window, keeping the edges nearest to its screen's edges
+// in place and the whole window on the screen (placement.Resize: a widget
+// expanded from the bottom of the screen used to grow off it, B4), remembers
+// the mode and position, and announces the mode as window:mode (the music
+// policy reacts to it).
 func (s *WindowService) SetMode(mode config.WindowMode) error {
 	if mode != config.WindowExpanded && mode != config.WindowCompact {
 		return fmt.Errorf("unknown window mode %q", mode)
 	}
 	w, h := WindowSize(mode)
 	win := s.window()
-	b := win.Bounds()
-	win.SetBounds(application.Rect{X: b.X, Y: b.Y, Width: w, Height: h})
-	if _, err := s.settings.modify(func(cur *config.Settings) { cur.Window.Mode = mode }); err != nil {
+	areas, _ := s.workAreas()
+	x, y := placement.Resize(rect(win.Bounds()), w, h, areas)
+	win.SetBounds(application.Rect{X: x, Y: y, Width: w, Height: h})
+	if _, err := s.settings.modify(func(cur *config.Settings) {
+		cur.Window.Mode = mode
+		cur.Window.X, cur.Window.Y = &x, &y
+	}); err != nil {
 		return err
 	}
 	s.emit.Emit(EventWindowMode, mode)
@@ -178,17 +185,9 @@ func (s *WindowService) SetAlwaysOnTop(on bool) error {
 // place puts the window at its saved position, or the default corner if that
 // position is no longer on any screen (SPEC §3.4).
 func (s *WindowService) place() {
-	screens := s.screens()
-	if len(screens) == 0 {
+	areas, primary := s.workAreas()
+	if len(areas) == 0 {
 		return
-	}
-	var areas []placement.Rect
-	primary := screens[0].WorkArea
-	for _, sc := range screens {
-		areas = append(areas, rect(sc.WorkArea))
-		if sc.IsPrimary {
-			primary = sc.WorkArea
-		}
 	}
 	cur := s.settings.Get().Window
 	var saved *[2]int
@@ -196,8 +195,21 @@ func (s *WindowService) place() {
 		saved = &[2]int{*cur.X, *cur.Y}
 	}
 	w, h := WindowSize(cur.Mode)
-	x, y := placement.Place(saved, w, h, areas, rect(primary))
+	x, y := placement.Place(saved, w, h, areas, primary)
 	s.window().SetBounds(application.Rect{X: x, Y: y, Width: w, Height: h})
+}
+
+// workAreas returns the usable areas of all screens and the primary one's;
+// none if Wails reports no screens.
+func (s *WindowService) workAreas() (areas []placement.Rect, primary placement.Rect) {
+	screens := s.screens()
+	for i, sc := range screens {
+		areas = append(areas, rect(sc.WorkArea))
+		if i == 0 || sc.IsPrimary {
+			primary = rect(sc.WorkArea)
+		}
+	}
+	return areas, primary
 }
 
 // moved saves the position once the window has stopped moving.

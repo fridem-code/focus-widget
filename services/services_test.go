@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"os"
 	"reflect"
 	"sync"
 	"testing"
@@ -198,7 +199,7 @@ func TestTimerServiceLifecycle(t *testing.T) {
 
 func newSettingsService(t *testing.T) (*SettingsService, *config.Store, *timer.Timer, *fakeEmitter) {
 	t.Helper()
-	store := config.NewStore(t.TempDir(), slog.New(slog.DiscardHandler))
+	store := config.NewStore(storeDir(t), slog.New(slog.DiscardHandler))
 	initial := config.Default()
 	emit := &fakeEmitter{}
 	tm := newTimer(t, initial.Timer)
@@ -378,4 +379,25 @@ func TestSettingsConcurrentUpdatesStayConsistent(t *testing.T) {
 	if st := tm.State(); st.RemainingMs != (time.Duration(final.Timer.FocusMin) * time.Minute).Milliseconds() {
 		t.Fatalf("timer has %dms, settings say %d min", st.RemainingMs, final.Timer.FocusMin)
 	}
+}
+
+// storeDir is a temp dir for a settings store, removed with retries: on
+// Windows a config file the store has just renamed can stay locked for a
+// moment (an antivirus scan), and t.TempDir's cleanup then fails the test.
+func storeDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "focuswidget-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for range 20 {
+			if err = os.RemoveAll(dir); err == nil {
+				return
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		t.Logf("leaving %s: %v", dir, err)
+	})
+	return dir
 }

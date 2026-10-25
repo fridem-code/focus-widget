@@ -11,6 +11,7 @@ import (
 
 	"focuswidget/internal/catalog"
 	"focuswidget/internal/config"
+	"focuswidget/internal/foreground"
 	"focuswidget/internal/timer"
 	"focuswidget/services"
 )
@@ -112,6 +113,21 @@ func New(assets fs.FS) (*application.App, error) {
 		},
 		URL: "/",
 	})
+
+	// Some apps open over always-on-top windows (Paint, docs/BUGS.md B2): pin
+	// the widget again whenever another app comes to the foreground.
+	keeper := services.NewTopmostKeeper(settingsService, windowService, func() {
+		if hwnd := mainWindow.NativeWindow(); hwnd != nil {
+			if err := foreground.Pin(uintptr(hwnd)); err != nil {
+				logger.Warn("pin the window on top", "err", err)
+			}
+		}
+	})
+	if stop, err := foreground.Watch(keeper.ForegroundChanged); err != nil {
+		logger.Warn("watch foreground windows", "err", err)
+	} else {
+		wailsApp.OnShutdown(stop)
+	}
 
 	tray := services.NewTray(t, settingsService, windowService, emitter)
 	buildTray(wailsApp, tray)

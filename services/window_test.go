@@ -141,7 +141,33 @@ func TestWindowSize(t *testing.T) {
 	}
 }
 
-func TestSetModeResizesAroundTopLeftSavesAndAnnounces(t *testing.T) {
+// B4: a compact widget at the bottom of the screen expands upwards, stays on
+// the screen, and collapses back to where it was.
+func TestSetModeKeepsTheWindowOnScreen(t *testing.T) {
+	screen := &application.Screen{IsPrimary: true, WorkArea: application.Rect{X: 0, Y: 0, Width: 1536, Height: 912}}
+	svc, win, settings, _ := newWindowService(t, screen)
+	win.bounds = application.Rect{X: 3, Y: 813, Width: CompactWidth, Height: CompactHeight}
+
+	if err := svc.SetMode(config.WindowExpanded); err != nil {
+		t.Fatal(err)
+	}
+	if want := (application.Rect{X: 3, Y: 813 + 96 - 540, Width: 380, Height: 540}); win.Bounds() != want {
+		t.Fatalf("expanded bounds = %+v, want %+v", win.Bounds(), want)
+	}
+	if s := settings.Get().Window; *s.X != 3 || *s.Y != 813+96-540 {
+		t.Fatalf("saved position = (%d, %d)", *s.X, *s.Y)
+	}
+
+	if err := svc.SetMode(config.WindowCompact); err != nil {
+		t.Fatal(err)
+	}
+	if want := (application.Rect{X: 3, Y: 813, Width: 300, Height: 96}); win.Bounds() != want {
+		t.Fatalf("compact bounds = %+v, want %+v", win.Bounds(), want)
+	}
+}
+
+// Without screen info the window resizes around its top-left corner.
+func TestSetModeResizesSavesAndAnnounces(t *testing.T) {
 	svc, win, settings, emit := newWindowService(t)
 
 	if err := svc.SetMode(config.WindowCompact); err != nil {
