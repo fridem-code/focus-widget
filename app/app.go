@@ -60,7 +60,8 @@ func New(assets fs.FS) (*application.App, error) {
 	windowService := services.NewWindowService(settingsService, emitter,
 		func() services.Window { return mainWindow },
 		func() []*application.Screen { return wailsApp.Screen.GetAll() },
-		func() { wailsApp.Quit() })
+		func() { wailsApp.Quit() },
+		windowGlass{window: func() *application.WebviewWindow { return mainWindow }, logger: logger})
 	wailsApp = application.New(application.Options{
 		Name:         name,
 		Description:  description,
@@ -105,12 +106,16 @@ func New(assets fs.FS) (*application.App, error) {
 		Frameless:     true,
 		AlwaysOnTop:   settings.Window.AlwaysOnTop,
 		DisableResize: true,
-		// Glass: system Acrylic behind a transparent webview, tinted by CSS. Windows
-		// draws the corners and shadow and swaps Acrylic for a solid fill while the
-		// window is inactive (docs/spike-results.md, T0.5).
+		// Glass: a transparent webview over the accent-policy blur that
+		// internal/glass turns on, tinted by CSS. The system Acrylic backdrop is
+		// off: Windows replaced it with a solid fill whenever the window was
+		// inactive (docs/BUGS.md B1, docs/spike-results.md T16). The accent only
+		// blurs with zero DWM frame margins, so Wails must not extend the frame
+		// on every activation, as it does for frameless windows with decorations.
 		BackgroundType: application.BackgroundTypeTranslucent,
 		Windows: application.WindowsWindow{
-			BackdropType: application.Acrylic,
+			BackdropType:                      application.None,
+			DisableFramelessWindowDecorations: true,
 		},
 		URL: "/",
 	})

@@ -40,3 +40,25 @@ export function applyTheme(theme: Theme, root: HTMLElement = document.documentEl
   if (theme === Theme.ThemeDark || theme === Theme.ThemeLight) root.dataset.theme = theme
   else delete root.dataset.theme
 }
+
+/** Whether the page shows the dark theme: the pinned one, or the system's. */
+export function themeIsDark(theme: Theme, systemDark: boolean): boolean {
+  if (theme === Theme.ThemeDark) return true
+  if (theme === Theme.ThemeLight) return false
+  return systemDark
+}
+
+/**
+ * Asks Go for the window glass tinted for the page's theme (T16) and marks the
+ * page: only data-glass="on" makes --glass translucent, so a window left
+ * without glass (transparency effects off in Windows) stays opaque.
+ */
+export async function syncGlass(
+  dark: boolean,
+  setGlass: (dark: boolean) => Promise<boolean>,
+  root: HTMLElement = document.documentElement,
+) {
+  const on = await setGlass(dark).catch(() => false)
+  if (on) root.dataset.glass = 'on'
+  else delete root.dataset.glass
+}

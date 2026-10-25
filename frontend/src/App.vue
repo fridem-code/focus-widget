@@ -24,7 +24,13 @@ import TitleBar from './components/TitleBar.vue'
 import { useMusic } from './composables/useMusic'
 import { connectMusicPolicy } from './composables/useMusicPolicy'
 import { connectPhaseSound } from './composables/usePhaseSound'
-import { applyTheme, createSettingsStore, type SettingsStore } from './composables/useSettings'
+import {
+  applyTheme,
+  createSettingsStore,
+  syncGlass,
+  themeIsDark,
+  type SettingsStore,
+} from './composables/useSettings'
 import { useTimer } from './composables/useTimer'
 import { useWindowActive } from './composables/useWindowActive'
 import { persistMusic } from './lib/persistMusic'
@@ -57,11 +63,18 @@ onMounted(async () => {
   const settingsStore = createSettingsStore(settings)
   store.value = settingsStore
   offEvents.push(settingsStore.stop)
-  applyTheme(settings.window.theme)
-  watch(
-    () => settingsStore.settings.value.window.theme,
-    (t) => applyTheme(t),
-  )
+  // The theme and the window glass tinted for it follow the setting and, for
+  // "system", Windows.
+  const systemDark = matchMedia('(prefers-color-scheme: dark)')
+  const syncTheme = () => {
+    const theme = settingsStore.settings.value.window.theme
+    applyTheme(theme)
+    void syncGlass(themeIsDark(theme, systemDark.matches), WindowService.SetGlass)
+  }
+  syncTheme()
+  watch(() => settingsStore.settings.value.window.theme, syncTheme)
+  systemDark.addEventListener('change', syncTheme)
+  offEvents.push(() => systemDark.removeEventListener('change', syncTheme))
   watch(
     () => settingsStore.settings.value.music.shuffle,
     (on) => music.setShuffle(on),

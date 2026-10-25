@@ -89,7 +89,7 @@ func newWindowService(t *testing.T, screens ...*application.Screen) (*WindowServ
 	settings, _, _, emit := newSettingsService(t)
 	win := &fakeWindow{bounds: application.Rect{X: 100, Y: 50, Width: ExpandedWidth, Height: ExpandedHeight}}
 	svc := NewWindowService(settings, emit, func() Window { return win },
-		func() []*application.Screen { return screens }, func() { win.quits++ })
+		func() []*application.Screen { return screens }, func() { win.quits++ }, &fakeGlass{on: true})
 	return svc, win, settings, emit
 }
 
@@ -291,5 +291,46 @@ func TestMovedSavesPositionOnceItRests(t *testing.T) {
 	}
 	if err := svc.ServiceShutdown(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+type fakeGlass struct {
+	on         bool
+	systemDark bool
+	applied    []bool // dark per Apply call
+}
+
+func (g *fakeGlass) Apply(dark bool) bool {
+	g.applied = append(g.applied, dark)
+	return g.on
+}
+
+func (g *fakeGlass) SystemDark() bool { return g.systemDark }
+
+// B1: the glass goes on before the window shows, for the theme the page will
+// show ("system" follows Windows), and the page can switch it with its theme.
+func TestGlassGoesOnBeforeTheWindowShows(t *testing.T) {
+	svc, win, settings, _ := newWindowService(t)
+	glass := svc.glass.(*fakeGlass)
+	glass.systemDark = true
+	if err := svc.ServiceStartup(context.Background(), application.ServiceOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(glass.applied) != 0 {
+		t.Fatal("glass applied before the page was ready")
+	}
+	win.fire(events.Common.WindowRuntimeReady)
+	if !reflect.DeepEqual(glass.applied, []bool{true}) || !win.shown {
+		t.Fatalf("applied = %v, shown = %v; want dark glass (system theme) and a shown window", glass.applied, win.shown)
+	}
+
+	if _, err := settings.Patch(SettingsPatch{Theme: new(config.ThemeLight)}); err != nil {
+		t.Fatal(err)
+	}
+	if svc.themeDark() {
+		t.Fatal("light theme setting resolved as dark")
+	}
+	if on := svc.SetGlass(false); !on || glass.applied[1] {
+		t.Fatalf("SetGlass(false) = %v, applied = %v", on, glass.applied)
 	}
 }

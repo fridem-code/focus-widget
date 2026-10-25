@@ -44,15 +44,26 @@ type Window interface {
 	RegisterHook(events.WindowEventType, func(*application.WindowEvent)) func()
 }
 
+// Glass draws the blurred window background (internal/glass).
+type Glass interface {
+	// Apply turns the glass on, tinted for the dark or light theme. It
+	// reports false when the window stays opaque: transparency effects are
+	// off in Windows, or turning the glass on failed.
+	Apply(dark bool) bool
+	// SystemDark reports whether Windows apps use the dark theme.
+	SystemDark() bool
+}
+
 // WindowService switches between expanded and compact mode, toggles
-// always-on-top, hides to and shows from the tray, and remembers and
-// restores the window position.
+// always-on-top, hides to and shows from the tray, remembers and restores the
+// window position, and turns the glass on.
 type WindowService struct {
 	settings *SettingsService
 	emit     Emitter
 	window   func() Window // the window is created after the services
 	screens  func() []*application.Screen
 	quit     func()
+	glass    Glass
 
 	mu        sync.Mutex
 	saveTimer *time.Timer
@@ -61,8 +72,28 @@ type WindowService struct {
 }
 
 func NewWindowService(settings *SettingsService, emit Emitter, window func() Window,
-	screens func() []*application.Screen, quit func()) *WindowService {
-	return &WindowService{settings: settings, emit: emit, window: window, screens: screens, quit: quit}
+	screens func() []*application.Screen, quit func(), glass Glass) *WindowService {
+	return &WindowService{settings: settings, emit: emit, window: window, screens: screens, quit: quit, glass: glass}
+}
+
+// SetGlass turns the glass on for the theme the page shows and reports
+// whether it is on; the page keeps an opaque background when it is not. The
+// page calls it on start and whenever its theme changes.
+func (s *WindowService) SetGlass(dark bool) bool {
+	return s.glass.Apply(dark)
+}
+
+// themeDark resolves the theme setting the way the page does, "system"
+// following Windows.
+func (s *WindowService) themeDark() bool {
+	switch s.settings.Get().Window.Theme {
+	case config.ThemeDark:
+		return true
+	case config.ThemeLight:
+		return false
+	default:
+		return s.glass.SystemDark()
+	}
 }
 
 // ServiceStartup remembers the position after every move, turns closing the
@@ -89,6 +120,9 @@ func (s *WindowService) ServiceStartup(context.Context, application.ServiceOptio
 	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
 		shown.Do(func() {
 			s.place()
+			// Before showing: a window without its glass is black until the
+			// page has asked for it.
+			s.glass.Apply(s.themeDark())
 			s.Show()
 		})
 	})

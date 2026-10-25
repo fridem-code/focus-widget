@@ -4,8 +4,8 @@
 :root {
   color-scheme: light dark;
 
-  /* Window glass, drawn over the system Acrylic backdrop. */
-  --glass: light-dark(rgba(246, 247, 250, 0.8), rgba(22, 24, 33, 0.72));
+  /* Window background: opaque until the window glass is on (data-glass below). */
+  --glass: light-dark(rgb(246, 247, 250), rgb(22, 24, 33));
   --glass-border: light-dark(rgba(20, 24, 40, 0.1), rgba(255, 255, 255, 0.12));
 
   --text: light-dark(#1a1c24, #f3f4f8);
@@ -45,6 +45,13 @@
   font-size: 13px;
   line-height: 1.4;
   color: var(--text);
+}
+
+/* The tint over the accent-policy blur (T16). The acrylic already evens out
+   bright backgrounds, so these keep muted text above 5.5:1 over white,
+   blue and purple (measured, docs/spike-results.md). */
+:root[data-glass='on'] {
+  --glass: light-dark(rgba(246, 247, 250, 0.45), rgba(22, 24, 33, 0.5));
 }
 
 :root[data-theme='light'] {

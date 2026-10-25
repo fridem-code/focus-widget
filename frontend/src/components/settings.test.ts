@@ -8,7 +8,7 @@ import {
   WindowMode,
   type Settings,
 } from '../../bindings/focuswidget/internal/config/models'
-import { applyTheme } from '../composables/useSettings'
+import { applyTheme, syncGlass, themeIsDark } from '../composables/useSettings'
 import { NUMBER_SPECS } from '../lib/settingsForm'
 import SettingsPanel from './SettingsPanel.vue'
 import SettingNumber from './settings/SettingNumber.vue'
@@ -194,6 +194,27 @@ describe('SettingsPanel', () => {
   it('shows «сессий» in the right form', async () => {
     const { wrapper } = mountPanel()
     expect(wrapper.findAll('.unit').map((u) => u.text())).toContain('сессии')
+  })
+})
+
+describe('window glass', () => {
+  it('resolves the theme the page shows', () => {
+    expect(themeIsDark(Theme.ThemeDark, false)).toBe(true)
+    expect(themeIsDark(Theme.ThemeLight, true)).toBe(false)
+    expect(themeIsDark(Theme.ThemeSystem, true)).toBe(true)
+    expect(themeIsDark(Theme.ThemeSystem, false)).toBe(false)
+  })
+
+  it('marks the page only when the glass is on', async () => {
+    const root = document.createElement('html')
+    const asked: boolean[] = []
+    await syncGlass(true, async (dark) => (asked.push(dark), true), root)
+    expect(root.dataset.glass).toBe('on')
+    await syncGlass(false, async () => false, root)
+    expect(root.dataset.glass).toBeUndefined()
+    await syncGlass(false, () => Promise.reject(new Error('no window')), root)
+    expect(root.dataset.glass).toBeUndefined()
+    expect(asked).toEqual([true])
   })
 })
 
