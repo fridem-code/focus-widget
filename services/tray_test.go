@@ -89,7 +89,7 @@ func newTray(t *testing.T) *trayFixture {
 		win: win, window: window, settings: settings, timer: tm, emit: emit,
 	}
 	f.items = TrayItems{Visibility: f.vis, Timer: f.timerIt, Mode: f.mode, AlwaysOnTop: f.onTop}
-	f.tray = NewTray(tm, settings, window, emit)
+	f.tray = NewTray(tm, settings, window, emit, func() int { return 0 })
 	window.Show()
 	f.tray.Attach(f.ui, f.items)
 	return f
@@ -101,6 +101,7 @@ func TestBuildTrayView(t *testing.T) {
 		return timer.State{Phase: p, Status: s, RemainingMs: rem, DurationMs: min(25)}
 	}
 	s := config.Default()
+	s.Timer.DailyGoal = 0 // the day's progress is TestTrayDay's
 	tests := []struct {
 		state   timer.State
 		tooltip string
@@ -113,7 +114,7 @@ func TestBuildTrayView(t *testing.T) {
 		{st(timer.LongBreak, timer.Idle, min(15)), "Focus Widget · длинный перерыв ждёт старта, 15 мин", "Старт"},
 	}
 	for _, tt := range tests {
-		v := BuildTrayView(tt.state, s, true)
+		v := BuildTrayView(tt.state, s, true, 0)
 		if v.Tooltip != tt.tooltip || v.Timer != tt.label {
 			t.Errorf("%+v: got %q / %q, want %q / %q", tt.state, v.Tooltip, v.Timer, tt.tooltip, tt.label)
 		}
@@ -121,13 +122,37 @@ func TestBuildTrayView(t *testing.T) {
 
 	s.Window.Mode = config.WindowCompact
 	s.Window.AlwaysOnTop = false
-	v := BuildTrayView(tests[0].state, s, false)
+	v := BuildTrayView(tests[0].state, s, false, 0)
 	if v.Visibility != "Показать" || v.Mode != "Развернуть" || v.AlwaysOnTop {
 		t.Fatalf("view = %+v", v)
 	}
 	s.Window.Mode = config.WindowExpanded
-	if v := BuildTrayView(tests[0].state, s, true); v.Visibility != "Скрыть" || v.Mode != "Компактный режим" {
+	if v := BuildTrayView(tests[0].state, s, true, 0); v.Visibility != "Скрыть" || v.Mode != "Компактный режим" {
 		t.Fatalf("view = %+v", v)
+	}
+}
+
+func TestTrayDay(t *testing.T) {
+	st := timer.State{Phase: timer.Focus, Status: timer.Idle, RemainingMs: 25 * 60_000, DurationMs: 25 * 60_000}
+	s := config.Default()
+	for _, tt := range []struct {
+		done, goal int
+		want       string
+	}{
+		{0, 8, " · сегодня 0 из 8"},
+		{9, 8, " · сегодня 9 из 8"},
+		{0, 0, ""},
+		{1, 0, " · сегодня 1 помидор"},
+		{3, 0, " · сегодня 3 помидора"},
+		{5, 0, " · сегодня 5 помидоров"},
+		{12, 0, " · сегодня 12 помидоров"},
+		{22, 0, " · сегодня 22 помидора"},
+	} {
+		s.Timer.DailyGoal = tt.goal
+		want := "Focus Widget · готов к фокусу, 25 мин" + tt.want
+		if got := BuildTrayView(st, s, true, tt.done).Tooltip; got != want {
+			t.Errorf("done %d, goal %d: %q, want %q", tt.done, tt.goal, got, want)
+		}
 	}
 }
 
@@ -150,7 +175,7 @@ func TestTrayAttachShowsStateAndRefreshOnlyOnChange(t *testing.T) {
 	if f.timerIt.label != "Пауза" || f.ui.updates != 2 {
 		t.Fatalf("after start: label=%q updates=%d", f.timerIt.label, f.ui.updates)
 	}
-	if f.ui.tooltips[len(f.ui.tooltips)-1] != "Focus Widget · фокус, осталось 25 мин" {
+	if f.ui.tooltips[len(f.ui.tooltips)-1] != "Focus Widget · фокус, осталось 25 мин · сегодня 0 из 8" {
 		t.Fatalf("tooltip = %q", f.ui.tooltips)
 	}
 }
@@ -165,7 +190,7 @@ func TestTrayFollowsEventsWithoutDeadlock(t *testing.T) {
 	win := &fakeWindow{}
 	window := NewWindowService(settings, emitter, func() Window { return win },
 		func() []*application.Screen { return nil }, func() {}, &fakeGlass{}, nil)
-	tray := NewTray(tm, settings, window, emitter)
+	tray := NewTray(tm, settings, window, emitter, func() int { return 0 })
 	emitter.Tray = tray
 	ui, onTop := &fakeTrayUI{}, &fakeItem{}
 	tray.Attach(ui, TrayItems{Visibility: &fakeItem{}, Timer: &fakeItem{}, Mode: &fakeItem{}, AlwaysOnTop: onTop})

@@ -7,7 +7,9 @@ import {
   type Settings,
 } from '../../bindings/focuswidget/internal/config/models'
 import type { SettingsPatch } from '../../bindings/focuswidget/services/models'
+import { HOTKEY_ACTIONS } from '../lib/hotkeys'
 import { NUMBER_SPECS, plural } from '../lib/settingsForm'
+import SettingHotkey from './settings/SettingHotkey.vue'
 import SettingNumber from './settings/SettingNumber.vue'
 import SettingSegmented from './settings/SettingSegmented.vue'
 import SettingSwitch from './settings/SettingSwitch.vue'
@@ -22,6 +24,11 @@ const props = defineProps<{
   autostart: { enabled: () => Promise<boolean>; set: (on: boolean) => Promise<void> }
   /** The music folder for "Мои файлы" (T22): choose resolves to the folder, "" if cancelled. */
   musicFolder: { choose: () => Promise<string>; clear: () => Promise<void> }
+  /**
+   * Global shortcuts (T26): the ones that don't work, as action → reason, and
+   * a switch that frees them all while one is being recorded.
+   */
+  hotkeys: { status: Partial<Record<string, string>>; suspend: (on: boolean) => void }
 }>()
 const emit = defineEmits<{
   back: []
@@ -80,6 +87,12 @@ const themeOptions = [
   { value: Theme.ThemeLight, label: 'Светлая' },
 ]
 const sessions = (n: number) => plural(n, 'сессия', 'сессии', 'сессий')
+
+// The action that already has a shortcut, so one shortcut never runs two.
+function hotkeyTakenBy(combo: string) {
+  const hk = props.settings.hotkeys
+  return HOTKEY_ACTIONS.find((a) => hk[a.key] === combo)?.label ?? null
+}
 </script>
 
 <template>
@@ -150,6 +163,14 @@ const sessions = (n: number) => plural(n, 'сессия', 'сессии', 'се�
           :spec="NUMBER_SPECS.longBreakEvery"
           @commit="set({ longBreakEvery: $event })"
         />
+        <SettingNumber
+          label="Цель: помидоров в день"
+          unit=""
+          :value="settings.timer.dailyGoal"
+          :spec="NUMBER_SPECS.dailyGoal"
+          @commit="set({ dailyGoal: $event })"
+        />
+        <p class="hint">0 — без цели</p>
         <SettingSwitch
           label="Автостарт перерывов"
           :value="settings.timer.autoStartBreaks"
@@ -245,6 +266,21 @@ const sessions = (n: number) => plural(n, 'сессия', 'сессии', 'се�
           label="Уведомление Windows"
           :value="settings.notify.toast"
           @toggle="set({ toast: $event })"
+        />
+      </section>
+
+      <section aria-labelledby="s-hotkeys">
+        <h2 id="s-hotkeys">Горячие клавиши</h2>
+        <p class="hint">Работают в любом приложении</p>
+        <SettingHotkey
+          v-for="a in HOTKEY_ACTIONS"
+          :key="a.key"
+          :label="a.label"
+          :value="settings.hotkeys[a.key]"
+          :problem="hotkeys.status[a.key]"
+          :taken-by="hotkeyTakenBy"
+          @commit="set({ [a.patch]: $event })"
+          @recording="hotkeys.suspend"
         />
       </section>
 
@@ -410,6 +446,12 @@ select option {
 
 .reset:hover {
   background: var(--surface-hover);
+}
+
+.hint {
+  margin: -2px 0 4px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .save-error {

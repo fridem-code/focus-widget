@@ -2,6 +2,7 @@ package services
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"focuswidget/internal/config"
 	"focuswidget/internal/timer"
@@ -15,20 +16,32 @@ type SettingsService struct {
 	timer *timer.Timer
 	emit  Emitter
 
-	mu      sync.Mutex
-	current config.Settings
+	// mu orders changes. Reads need no lock: the current settings are an
+	// immutable snapshot swapped atomically, so timer listeners may read them
+	// even while a change waits for the timer (see modify).
+	mu        sync.Mutex
+	current   atomic.Pointer[config.Settings]
+	listeners []func(old, next config.Settings)
 }
 
 // NewSettingsService starts from initial, which must already be valid (as
 // returned by config.Store.Load).
 func NewSettingsService(store *config.Store, initial config.Settings, t *timer.Timer, emit Emitter) *SettingsService {
-	return &SettingsService{store: store, timer: t, emit: emit, current: initial}
+	s := &SettingsService{store: store, timer: t, emit: emit}
+	s.current.Store(&initial)
+	return s
 }
 
 func (s *SettingsService) Get() config.Settings {
+	return *s.current.Load()
+}
+
+// OnChange registers fn for every committed change. It runs while the change
+// still holds the lock, so it must not change settings itself.
+func (s *SettingsService) OnChange(fn func(old, next config.Settings)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.current
+	s.listeners = append(s.listeners, fn)
 }
 
 // Update replaces all settings. Invalid settings are rejected with an error
@@ -47,12 +60,18 @@ type SettingsPatch struct {
 	AutoStartBreaks *bool                 `json:"autoStartBreaks,omitempty"`
 	AutoStartFocus  *bool                 `json:"autoStartFocus,omitempty"`
 	PauseOnLock     *bool                 `json:"pauseOnLock,omitempty"`
+	Label           *string               `json:"label,omitempty"`
+	DailyGoal       *int                  `json:"dailyGoal,omitempty"`
 	Shuffle         *bool                 `json:"shuffle,omitempty"`
 	BreakBehavior   *config.BreakBehavior `json:"breakBehavior,omitempty"`
 	DuckVolume      *int                  `json:"duckVolume,omitempty"`
 	Sound           *bool                 `json:"sound,omitempty"`
 	Toast           *bool                 `json:"toast,omitempty"`
 	Theme           *config.Theme         `json:"theme,omitempty"`
+	// Shortcuts, "" turns one off (T26).
+	HotkeyStartPause *string `json:"hotkeyStartPause,omitempty"`
+	HotkeyShowHide   *string `json:"hotkeyShowHide,omitempty"`
+	HotkeyNextTrack  *string `json:"hotkeyNextTrack,omitempty"`
 }
 
 // Patch changes only the fields set in p, on top of the settings as they are
@@ -68,12 +87,17 @@ func (s *SettingsService) Patch(p SettingsPatch) (config.Settings, error) {
 		set(&cur.Timer.AutoStartBreaks, p.AutoStartBreaks)
 		set(&cur.Timer.AutoStartFocus, p.AutoStartFocus)
 		set(&cur.Timer.PauseOnLock, p.PauseOnLock)
+		set(&cur.Timer.Label, p.Label)
+		set(&cur.Timer.DailyGoal, p.DailyGoal)
 		set(&cur.Music.Shuffle, p.Shuffle)
 		set(&cur.Music.BreakBehavior, p.BreakBehavior)
 		set(&cur.Music.DuckVolume, p.DuckVolume)
 		set(&cur.Notify.Sound, p.Sound)
 		set(&cur.Notify.Toast, p.Toast)
 		set(&cur.Window.Theme, p.Theme)
+		set(&cur.Hotkeys.StartPause, p.HotkeyStartPause)
+		set(&cur.Hotkeys.ShowHide, p.HotkeyShowHide)
+		set(&cur.Hotkeys.NextTrack, p.HotkeyNextTrack)
 	})
 }
 
@@ -93,21 +117,24 @@ func (s *SettingsService) modify(change func(*config.Settings)) (config.Settings
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	next := s.current
+	old := s.Get()
+	next := old
 	change(&next)
 	next.Version = config.CurrentVersion
 	if err := s.store.Save(next); err != nil { // Save validates first
-		return s.current, err
+		return old, err
 	}
-	// Only what the timer itself uses: not, say, pauseOnLock.
-	timerChanged := TimerConfig(next.Timer) != TimerConfig(s.current.Timer)
-	s.current = next
+	s.current.Store(&next)
 
-	if timerChanged {
+	// Only what the timer itself uses: not, say, pauseOnLock.
+	if TimerConfig(next.Timer) != TimerConfig(old.Timer) {
 		// Cannot fail: Save has validated the ranges, which are stricter than the timer's.
 		if err := s.timer.UpdateConfig(TimerConfig(next.Timer)); err != nil {
 			return next, err
 		}
+	}
+	for _, fn := range s.listeners {
+		fn(old, next)
 	}
 	s.emit.Emit(EventSettingsChanged, next)
 	return next, nil

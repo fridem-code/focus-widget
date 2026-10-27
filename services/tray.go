@@ -51,6 +51,8 @@ type Tray struct {
 	settings *SettingsService
 	window   *WindowService
 	emit     Emitter
+	// focusToday counts today's finished focus sessions (T25).
+	focusToday func() int
 
 	mu    sync.Mutex
 	ui    TrayUI
@@ -58,8 +60,8 @@ type Tray struct {
 	last  TrayView
 }
 
-func NewTray(t *timer.Timer, settings *SettingsService, window *WindowService, emit Emitter) *Tray {
-	return &Tray{timer: t, settings: settings, window: window, emit: emit}
+func NewTray(t *timer.Timer, settings *SettingsService, window *WindowService, emit Emitter, focusToday func() int) *Tray {
+	return &Tray{timer: t, settings: settings, window: window, emit: emit, focusToday: focusToday}
 }
 
 // Attach connects the built tray menu and shows the current state.
@@ -98,7 +100,7 @@ func (t *Tray) Refresh() {
 	if t.ui == nil {
 		return
 	}
-	v := BuildTrayView(t.timer.State(), t.settings.Get(), t.window.Visible())
+	v := BuildTrayView(t.timer.State(), t.settings.Get(), t.window.Visible(), t.focusToday())
 	if v == t.last {
 		return
 	}
@@ -134,10 +136,11 @@ func TrayRing(st timer.State) trayicon.Ring {
 	}
 }
 
-// BuildTrayView computes the tray texts and icon.
-func BuildTrayView(st timer.State, s config.Settings, visible bool) TrayView {
+// BuildTrayView computes the tray texts and icon; focusToday is the number of
+// focus sessions finished today.
+func BuildTrayView(st timer.State, s config.Settings, visible bool, focusToday int) TrayView {
 	v := TrayView{
-		Tooltip:     "Focus Widget · " + trayStatus(st),
+		Tooltip:     "Focus Widget · " + trayStatus(st) + trayDay(focusToday, s.Timer.DailyGoal),
 		Visibility:  "Показать",
 		Mode:        "Компактный режим",
 		AlwaysOnTop: s.Window.AlwaysOnTop,
@@ -177,6 +180,31 @@ func trayStatus(st timer.State) string {
 			return fmt.Sprintf("готов к фокусу, %d мин", minutes)
 		}
 		return fmt.Sprintf("%s ждёт старта, %d мин", phase, minutes)
+	}
+}
+
+// trayDay is the day's progress (T25): "сегодня 3 из 8" with a goal; without
+// one just the count, once there is something to count.
+func trayDay(done, goal int) string {
+	switch {
+	case goal > 0:
+		return fmt.Sprintf(" · сегодня %d из %d", done, goal)
+	case done > 0:
+		return fmt.Sprintf(" · сегодня %d %s", done, pomodoros(done))
+	default:
+		return ""
+	}
+}
+
+// pomodoros agrees "помидор" with a count: 1 помидор, 3 помидора, 5 помидоров.
+func pomodoros(n int) string {
+	switch {
+	case n%10 == 1 && n%100 != 11:
+		return "помидор"
+	case n%10 >= 2 && n%10 <= 4 && (n%100 < 12 || n%100 > 14):
+		return "помидора"
+	default:
+		return "помидоров"
 	}
 }
 

@@ -2,16 +2,21 @@
 import { Events } from '@wailsio/runtime'
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import {
+  HotkeysStatus,
+  StatsChanged,
   UiCommand,
   WindowMode as WindowModeEvent,
   WindowVisible as WindowVisibleEvent,
 } from '../bindings/events'
 import { WindowMode } from '../bindings/focuswidget/internal/config/models'
+import type { Summary } from '../bindings/focuswidget/internal/stats/models'
 import { Phase } from '../bindings/focuswidget/internal/timer/models'
 import {
   AutostartService,
+  HotkeyService,
   MusicService,
   SettingsService,
+  StatsService,
   TimerService,
   WindowService,
 } from '../bindings/focuswidget/services'
@@ -19,6 +24,7 @@ import CompactBar from './components/CompactBar.vue'
 import MusicRow from './components/MusicRow.vue'
 import PlayerPanel from './components/PlayerPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
+import StatsPanel from './components/StatsPanel.vue'
 import TimerControls from './components/TimerControls.vue'
 import TimerView from './components/TimerView.vue'
 import TitleBar from './components/TitleBar.vue'
@@ -49,10 +55,10 @@ const windowMode = shallowRef<WindowModeController>()
 const compact = computed(() => windowMode.value?.mode.value === 'compact')
 /** False while hidden in the tray. */
 const visible = ref(true)
-const screen = ref<'timer' | 'settings'>('timer')
+const screen = ref<'timer' | 'settings' | 'stats'>('timer')
 /**
  * Whether the YouTube player can be seen. It can't in compact mode, in the
- * tray or behind the settings screen, and an unseen player must not play
+ * tray or behind the settings and statistics screens, and an unseen player must not play
  * (SPEC §2): the music player holds YouTube back while it is false. Generated
  * noise plays regardless.
  */
@@ -72,6 +78,36 @@ async function reloadCatalog(folder: string) {
   catalogFolder = folder
   music.setCatalog(await MusicService.Genres())
 }
+// The statistics (T23): fetched at start, pushed by Go after each finished
+// focus, and fetched again when the window comes back and at midnight, when
+// "today" starts over.
+const summary = ref<Summary | null>(null)
+async function refreshStats() {
+  summary.value = await StatsService.Summary()
+}
+let midnightTimer: ReturnType<typeof setTimeout> | undefined
+function refreshAtMidnight() {
+  const next = new Date()
+  next.setHours(24, 0, 1, 0)
+  midnightTimer = setTimeout(() => {
+    void refreshStats()
+    refreshAtMidnight()
+  }, next.getTime() - Date.now())
+}
+// Global shortcuts that don't work (T26), and freeing them while the settings
+// screen records a new one.
+const hotkeyStatus = ref<Partial<Record<string, string>>>({})
+const hotkeys = {
+  get status() {
+    return hotkeyStatus.value
+  },
+  suspend: (on: boolean) => void HotkeyService.Suspend(on),
+}
+function setLabel(label: string) {
+  void store.value?.patch({ label }).then((err) => {
+    if (err) console.warn('label not saved:', err)
+  })
+}
 const musicFolder = {
   // Choosing a folder also switches to its music.
   async choose() {
@@ -86,7 +122,15 @@ const musicFolder = {
 }
 
 onMounted(async () => {
-  const [catalog, settings] = await Promise.all([MusicService.Genres(), SettingsService.Get()])
+  const [catalog, settings, stats, status] = await Promise.all([
+    MusicService.Genres(),
+    SettingsService.Get(),
+    StatsService.Summary(),
+    HotkeyService.Status(),
+  ])
+  summary.value = stats
+  hotkeyStatus.value = status ?? {}
+  refreshAtMidnight()
   const settingsStore = createSettingsStore(settings)
   store.value = settingsStore
   offEvents.push(settingsStore.stop)
@@ -149,6 +193,13 @@ onMounted(async () => {
   offEvents.push(
     Events.On(WindowVisibleEvent, (ev) => {
       visible.value = ev.data
+      if (ev.data) void refreshStats()
+    }),
+    Events.On(StatsChanged, (ev) => {
+      summary.value = ev.data
+    }),
+    Events.On(HotkeysStatus, (ev) => {
+      hotkeyStatus.value = ev.data ?? {}
     }),
     // Tray commands the frontend carries out: it owns the player and the
     // order of pausing and resizing.
@@ -156,6 +207,7 @@ onMounted(async () => {
       if (ev.data === 'compact') void wm.compact()
       else if (ev.data === 'expand') void wm.expand()
       else if (ev.data === 'next-genre') music.nextGenre()
+      else if (ev.data === 'next-track') music.nextTrack()
     }),
   )
   // Rendered only now, so a window saved in compact mode never shows the
@@ -163,6 +215,7 @@ onMounted(async () => {
   ready.value = true
 })
 onUnmounted(() => {
+  clearTimeout(midnightTimer)
   offEvents.forEach((off) => off())
   windowMode.value?.stop()
   policy?.stop()
@@ -177,6 +230,11 @@ onUnmounted(() => {
 function onStart() {
   if (state.value?.phase === Phase.Focus) music.play({ fade: true })
   void start()
+}
+
+function openStats() {
+  screen.value = 'stats'
+  void refreshStats()
 }
 
 function setAlwaysOnTop(on: boolean) {
@@ -196,8 +254,13 @@ function setAlwaysOnTop(on: boolean) {
   >
     <TitleBar
       v-if="!compact && screen === 'timer'"
+      :label="store?.settings.value.timer.label ?? ''"
+      :done="summary?.today.focus ?? 0"
+      :goal="store?.settings.value.timer.dailyGoal ?? 0"
       @compact="windowMode?.compact()"
       @settings="screen = 'settings'"
+      @stats="openStats"
+      @label="setLabel"
     />
     <!-- Hidden, not unmounted: the stream must not reload (SPEC §3.4). -->
     <PlayerPanel
@@ -230,11 +293,19 @@ function setAlwaysOnTop(on: boolean) {
       :save="store.patch"
       :autostart="autostart"
       :music-folder="musicFolder"
+      :hotkeys="hotkeys"
       @back="screen = 'timer'"
       @hide="WindowService.Hide()"
       @genre="music.selectGenre($event)"
       @always-on-top="setAlwaysOnTop"
       @reset-cycle="TimerService.Reset()"
+    />
+    <StatsPanel
+      v-if="!compact && screen === 'stats'"
+      :summary="summary"
+      :goal="store?.settings.value.timer.dailyGoal ?? 0"
+      @back="screen = 'timer'"
+      @hide="WindowService.Hide()"
     />
     <CompactBar
       v-if="state && compact"

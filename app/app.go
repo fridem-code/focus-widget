@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -17,7 +18,9 @@ import (
 	"focuswidget/internal/catalog"
 	"focuswidget/internal/config"
 	"focuswidget/internal/foreground"
+	"focuswidget/internal/hotkey"
 	"focuswidget/internal/session"
+	"focuswidget/internal/stats"
 	"focuswidget/internal/timer"
 	"focuswidget/services"
 )
@@ -85,6 +88,18 @@ func New(assets fs.FS) (*application.App, error) {
 		func() { wailsApp.Quit() },
 		windowGlass{window: func() *application.WebviewWindow { return mainWindow }, logger: logger},
 		quietShow)
+	// Every focus that runs out goes into the session log (T23). Created before
+	// the phase notifier: its toast counts the session that just ended.
+	statsService := services.NewStatsService(t, stats.Open(dir, logger), settingsService, emitter, time.Now, func(err error) {
+		logger.Warn("record the session", "err", err)
+	})
+	var tray *services.Tray
+	// Global shortcuts (T26), carried out like the tray's menu commands.
+	hotkeyService := services.NewHotkeyService(settingsService, emitter, map[string]func(){
+		"startPause": func() { tray.ToggleTimer() },
+		"showHide":   windowService.ToggleVisible,
+		"nextTrack":  func() { emitter.Emit(services.EventUICommand, services.UINextTrack) },
+	}, hotkey.Watch)
 	autostartService := services.NewAutostartService(autostart.New(), func(err error) {
 		logger.Warn("refresh autostart", "err", err)
 	})
@@ -104,6 +119,8 @@ func New(assets fs.FS) (*application.App, error) {
 			application.NewService(musicService),
 			application.NewService(windowService),
 			application.NewService(autostartService),
+			application.NewService(statsService),
+			application.NewService(hotkeyService),
 			application.NewService(toasts),
 		},
 		Assets: application.AssetOptions{
@@ -164,13 +181,13 @@ func New(assets fs.FS) (*application.App, error) {
 		wailsApp.OnShutdown(stop)
 	}
 
-	tray := services.NewTray(t, settingsService, windowService, emitter)
+	tray = services.NewTray(t, settingsService, windowService, emitter, statsService.FocusToday)
 	buildTray(wailsApp, tray)
 	emitter.Tray = tray
 
 	// Toast when a phase runs out (the chime is the frontend's); clicking the
 	// toast brings the window back.
-	services.NewPhaseNotifier(t, toasts, settingsService, func(err error) {
+	services.NewPhaseNotifier(t, toasts, settingsService, statsService.FocusToday, func(err error) {
 		logger.Warn("phase-end toast failed", "err", err)
 	})
 	// Pause a running focus while the PC is locked; after the unlock a toast

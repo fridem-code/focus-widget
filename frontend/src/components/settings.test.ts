@@ -29,6 +29,8 @@ const settings = (): Settings => ({
     autoStartBreaks: false,
     autoStartFocus: false,
     pauseOnLock: true,
+    label: '',
+    dailyGoal: 8,
   },
   music: {
     volume: 60,
@@ -48,6 +50,11 @@ const settings = (): Settings => ({
     y: null,
   },
   notify: { sound: true, toast: true },
+  hotkeys: {
+    startPause: 'Ctrl+Alt+Shift+P',
+    showHide: 'Ctrl+Alt+Shift+F',
+    nextTrack: 'Ctrl+Alt+Shift+N',
+  },
 })
 
 const genres: Genre[] = [
@@ -74,10 +81,14 @@ function mountPanel(initial = settings(), result: string | null = null) {
     choose: vi.fn(async () => 'D:\\Music\\Focus'),
     clear: vi.fn(async () => {}),
   }
+  const hotkeys = {
+    status: {} as Partial<Record<string, string>>,
+    suspend: vi.fn((on: boolean) => void on),
+  }
   const wrapper = mount(SettingsPanel, {
-    props: { settings: initial, genres, genreId: 'lofi', save, autostart, musicFolder },
+    props: { settings: initial, genres, genreId: 'lofi', save, autostart, musicFolder, hotkeys },
   })
-  return { wrapper, saved, save, autostart, musicFolder }
+  return { wrapper, saved, save, autostart, musicFolder, hotkeys }
 }
 
 const flush = () => new Promise((r) => setTimeout(r))
@@ -169,6 +180,46 @@ describe('SettingsPanel', () => {
     expect(wrapper.get('.folder-name').attributes('title')).toBe('D:\\Music\\Focus')
     await wrapper.get('button[aria-label="Забыть папку"]').trigger('click')
     expect(musicFolder.clear).toHaveBeenCalledOnce()
+  })
+
+  it('saves the daily goal, 0 included', async () => {
+    const { wrapper, saved } = mountPanel()
+    await field(wrapper, 'Цель: помидоров в день').setValue('0')
+    await flush()
+    expect(saved).toEqual([{ dailyGoal: 0 }])
+    expect(wrapper.text()).toContain('0 — без цели')
+  })
+
+  it('records a shortcut, freeing ours meanwhile', async () => {
+    const { wrapper, saved, hotkeys } = mountPanel()
+    const button = () => wrapper.findAll('button.combo')[2]!
+    expect(button().text()).toBe('Ctrl + Alt + Shift + N')
+    await button().trigger('click')
+    expect(hotkeys.suspend).toHaveBeenLastCalledWith(true)
+    expect(button().text()).toBe('Нажмите сочетание…')
+
+    await button().trigger('keydown', { code: 'KeyN' })
+    expect(wrapper.text()).toContain('Нужен Ctrl или Alt')
+    await button().trigger('keydown', { code: 'KeyP', ctrlKey: true, altKey: true, shiftKey: true })
+    expect(wrapper.text()).toContain('Уже у «Старт / пауза»')
+    await button().trigger('keydown', { code: 'F9', altKey: true })
+    await flush()
+    expect(saved).toEqual([{ hotkeyNextTrack: 'Alt+F9' }])
+    expect(hotkeys.suspend).toHaveBeenLastCalledWith(false)
+  })
+
+  it('turns a shortcut off and shows one that does not work', async () => {
+    const { wrapper, saved } = mountPanel()
+    await wrapper.setProps({
+      hotkeys: { status: { showHide: 'Занято другим приложением' }, suspend: () => {} },
+    })
+    expect(wrapper.get('.note.problem').text()).toBe('Занято другим приложением')
+    await wrapper.get('button[aria-label="Выключить «Старт / пауза»"]').trigger('click')
+    const combo = wrapper.findAll('button.combo')[1]!
+    await combo.trigger('click')
+    await combo.trigger('keydown', { code: 'Backspace' })
+    await flush()
+    expect(saved).toEqual([{ hotkeyStartPause: '' }, { hotkeyShowHide: '' }])
   })
 
   it('switches the pause on lock', async () => {

@@ -6,6 +6,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"focuswidget/internal/config"
+	"focuswidget/internal/stats"
 	"focuswidget/internal/timer"
 )
 
@@ -16,9 +17,13 @@ const (
 	EventSettingsChanged = "settings:changed"
 	EventWindowMode      = "window:mode"
 	EventWindowVisible   = "window:visible"
+	// EventStatsChanged carries the new statistics summary after a focus session ends (T23).
+	EventStatsChanged = "stats:changed"
+	// EventHotkeysStatus carries the shortcuts that could not be registered (T26).
+	EventHotkeysStatus = "hotkeys:status"
 	// EventUICommand asks the frontend to do something it owns: "compact",
-	// "expand" (it sequences music and resizing) or "next-genre" (the player
-	// lives there). Sent by the tray.
+	// "expand" (it sequences music and resizing), "next-genre" or "next-track"
+	// (the player lives there). Sent by the tray and the global shortcuts.
 	EventUICommand = "ui:command"
 )
 
@@ -27,6 +32,8 @@ const (
 	UICompact   = "compact"
 	UIExpand    = "expand"
 	UINextGenre = "next-genre"
+	// UINextTrack comes from the global shortcut (T26).
+	UINextTrack = "next-track"
 )
 
 func init() {
@@ -38,6 +45,8 @@ func init() {
 	application.RegisterEvent[config.WindowMode](EventWindowMode)
 	application.RegisterEvent[bool](EventWindowVisible)
 	application.RegisterEvent[string](EventUICommand)
+	application.RegisterEvent[stats.Summary](EventStatsChanged)
+	application.RegisterEvent[map[string]string](EventHotkeysStatus)
 }
 
 // Emitter publishes an event to the frontend; *application.EventManager

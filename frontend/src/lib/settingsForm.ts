@@ -12,6 +12,7 @@ export const NUMBER_SPECS = {
   longBreakMin: { min: 1, max: 180 },
   longBreakEvery: { min: 2, max: 10 },
   duckVolume: { min: 0, max: 100 },
+  dailyGoal: { min: 0, max: 24 },
 } as const satisfies Record<string, NumberSpec>
 
 export type NumberField = keyof typeof NUMBER_SPECS

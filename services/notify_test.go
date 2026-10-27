@@ -58,7 +58,7 @@ func TestPhaseEndMessage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			title, body, ok := PhaseEndMessage(tt.tr)
+			title, body, ok := PhaseEndMessage(tt.tr, PhaseDay{})
 			if !ok || title != tt.title || body != tt.body {
 				t.Fatalf("got %q / %q / %v", title, body, ok)
 			}
@@ -66,7 +66,7 @@ func TestPhaseEndMessage(t *testing.T) {
 	}
 
 	for _, cause := range []timer.Cause{timer.CauseStart, timer.CausePause, timer.CauseResume, timer.CauseSkip, timer.CauseResetPhase, timer.CauseReset} {
-		if _, _, ok := PhaseEndMessage(tr(timer.Focus, timer.State{Phase: timer.ShortBreak}, cause)); ok {
+		if _, _, ok := PhaseEndMessage(tr(timer.Focus, timer.State{Phase: timer.ShortBreak}, cause), PhaseDay{}); ok {
 			t.Errorf("%s produced a toast", cause)
 		}
 	}
@@ -131,7 +131,7 @@ func TestPhaseNotifierOneToastPerPhaseEnd(t *testing.T) {
 	clock := newStepClock()
 	tm := runTimer(t, clock)
 	sender := &fakeSender{}
-	NewPhaseNotifier(tm, sender, settings, nil)
+	NewPhaseNotifier(tm, sender, settings, nil, nil)
 
 	_ = tm.Start()
 	tm.Skip()
@@ -157,7 +157,7 @@ func TestPhaseNotifierRespectsSettingAndReportsErrors(t *testing.T) {
 	sender := &fakeSender{err: errors.New("toast failed")}
 	var errs []error
 	var mu sync.Mutex
-	NewPhaseNotifier(tm, sender, settings, func(err error) { mu.Lock(); errs = append(errs, err); mu.Unlock() })
+	NewPhaseNotifier(tm, sender, settings, nil, func(err error) { mu.Lock(); errs = append(errs, err); mu.Unlock() })
 
 	off := settings.Get()
 	off.Notify.Toast = false

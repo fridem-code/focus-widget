@@ -41,6 +41,18 @@ func TestValidateAndNormalize(t *testing.T) {
 			func(s Settings) bool { return s.Music.BreakBehavior == BreakPause }},
 		{"relative music folder", func(s *Settings) { s.Music.LocalFolder = `Music\focus` }, "music.localFolder",
 			func(s Settings) bool { return s.Music.LocalFolder == "" }},
+		{"daily goal", func(s *Settings) { s.Timer.DailyGoal = MaxDailyGoal + 1 }, "timer.dailyGoal",
+			func(s Settings) bool { return s.Timer.DailyGoal == 8 }},
+		{"long label", func(s *Settings) { s.Timer.Label = strings.Repeat("я", MaxLabelRunes+1) }, "timer.label",
+			func(s Settings) bool { return s.Timer.Label == "" }},
+		{"label on two lines", func(s *Settings) { s.Timer.Label = "a\nb" }, "timer.label",
+			func(s Settings) bool { return s.Timer.Label == "" }},
+		{"unknown hotkey", func(s *Settings) { s.Hotkeys.ShowHide = "Ctrl+Tab" }, "hotkeys.showHide",
+			func(s Settings) bool { return s.Hotkeys.ShowHide == "Ctrl+Alt+Shift+F" }},
+		{"hotkey without Ctrl or Alt", func(s *Settings) { s.Hotkeys.NextTrack = "Shift+N" }, "hotkeys.nextTrack",
+			func(s Settings) bool { return s.Hotkeys.NextTrack == "Ctrl+Alt+Shift+N" }},
+		{"one hotkey for two actions", func(s *Settings) { s.Hotkeys.NextTrack = "shift+alt+ctrl+p" }, "hotkeys.nextTrack",
+			func(s Settings) bool { return s.Hotkeys.NextTrack == "" && s.Hotkeys.StartPause == "Ctrl+Alt+Shift+P" }},
 		{"window mode", func(s *Settings) { s.Window.Mode = "fullscreen" }, "window.mode",
 			func(s Settings) bool { return s.Window.Mode == WindowExpanded }},
 		{"theme", func(s *Settings) { s.Window.Theme = "sepia" }, "window.theme",
@@ -86,6 +98,9 @@ func TestValidateBoundsAreInclusive(t *testing.T) {
 	s.Music.BreakBehavior = BreakContinue
 	s.Window.Mode = WindowCompact
 	s.Window.X, s.Window.Y = new(-1200), new(40) // negative: monitor left of the primary one
+	s.Timer.DailyGoal = 0                        // no goal
+	s.Timer.Label = strings.Repeat("я", MaxLabelRunes)
+	s.Hotkeys = HotkeySettings{} // all off
 	if err := s.Validate(); err != nil {
 		t.Fatalf("boundary values rejected: %v", err)
 	}

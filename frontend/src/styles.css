@@ -61,6 +61,13 @@
   color-scheme: dark;
 }
 
+/* The :root values again, for a part of the page that keeps focus colours
+   whatever the phase (the statistics screen). */
+[data-phase='focus'] {
+  --accent: #4c63e6;
+  --accent-text: light-dark(#3346b8, #aebbff);
+  --accent-soft: light-dark(rgba(76, 99, 230, 0.12), rgba(76, 99, 230, 0.24));
+}
 [data-phase='short_break'] {
   --accent: #b5530f;
   --accent-text: light-dark(#8f4008, #ffb27a);

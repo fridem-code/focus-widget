@@ -7,6 +7,9 @@ import (
 	"math"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
+
+	"focuswidget/internal/hotkey"
 )
 
 // CurrentVersion is the schema version written by this build.
@@ -42,6 +45,7 @@ type Settings struct {
 	Music   MusicSettings  `json:"music"`
 	Window  WindowSettings `json:"window"`
 	Notify  NotifySettings `json:"notify"`
+	Hotkeys HotkeySettings `json:"hotkeys"`
 }
 
 type TimerSettings struct {
@@ -53,6 +57,11 @@ type TimerSettings struct {
 	AutoStartFocus  bool `json:"autoStartFocus"`
 	// PauseOnLock pauses a running focus phase while the PC is locked (T20).
 	PauseOnLock bool `json:"pauseOnLock"`
+	// Label is what the user is working on (T24), kept until they change it;
+	// it goes into the phase-end toast and the session log.
+	Label string `json:"label"`
+	// DailyGoal is the number of focus sessions a day to aim for (T25); 0 is no goal.
+	DailyGoal int `json:"dailyGoal"`
 }
 
 type MusicSettings struct {
@@ -82,11 +91,32 @@ type NotifySettings struct {
 	Toast bool `json:"toast"`
 }
 
+// HotkeySettings are system-wide shortcuts such as "Ctrl+Alt+Shift+P" (T26,
+// the format of hotkey.Parse); "" turns one off.
+type HotkeySettings struct {
+	StartPause string `json:"startPause"`
+	ShowHide   string `json:"showHide"`
+	NextTrack  string `json:"nextTrack"`
+}
+
+// Fields lists the shortcuts by their JSON names, for code that treats them alike.
+func (h *HotkeySettings) Fields() []struct {
+	Name  string
+	Value *string
+} {
+	return []struct {
+		Name  string
+		Value *string
+	}{{"startPause", &h.StartPause}, {"showHide", &h.ShowHide}, {"nextTrack", &h.NextTrack}}
+}
+
 const (
 	MinPhaseMin       = 1
 	MaxPhaseMin       = 180
 	MinLongBreakEvery = 2
 	MaxLongBreakEvery = 10
+	MaxLabelRunes     = 60
+	MaxDailyGoal      = 24
 )
 
 // Default returns the settings used on first launch.
@@ -101,6 +131,7 @@ func Default() Settings {
 			AutoStartBreaks: true,
 			AutoStartFocus:  false,
 			PauseOnLock:     true,
+			DailyGoal:       8,
 		},
 		Music: MusicSettings{
 			Volume:        50,
@@ -115,6 +146,12 @@ func Default() Settings {
 			Theme:       ThemeSystem,
 		},
 		Notify: NotifySettings{Sound: true, Toast: true},
+		// Three modifiers: unlikely to be taken by the IDE the user works in.
+		Hotkeys: HotkeySettings{
+			StartPause: "Ctrl+Alt+Shift+P",
+			ShowHide:   "Ctrl+Alt+Shift+F",
+			NextTrack:  "Ctrl+Alt+Shift+N",
+		},
 	}
 }
 
@@ -161,6 +198,11 @@ func (s *Settings) check(fix bool) []string {
 	intRange("timer.shortBreakMin", &t.ShortBreakMin, MinPhaseMin, MaxPhaseMin, def.Timer.ShortBreakMin)
 	intRange("timer.longBreakMin", &t.LongBreakMin, MinPhaseMin, MaxPhaseMin, def.Timer.LongBreakMin)
 	intRange("timer.longBreakEvery", &t.LongBreakEvery, MinLongBreakEvery, MaxLongBreakEvery, def.Timer.LongBreakEvery)
+	intRange("timer.dailyGoal", &t.DailyGoal, 0, MaxDailyGoal, def.Timer.DailyGoal)
+	if n := utf8.RuneCountInString(t.Label); n > MaxLabelRunes || strings.ContainsAny(t.Label, "\r\n") {
+		report("timer.label", fmt.Sprintf("%q", t.Label), fmt.Sprintf("is not one line of at most %d characters", MaxLabelRunes),
+			func() { t.Label = "" })
+	}
 
 	m := &s.Music
 	intRange("music.volume", &m.Volume, 0, 100, def.Music.Volume)
@@ -190,6 +232,27 @@ func (s *Settings) check(fix bool) []string {
 	}
 	if (s.Window.X == nil) != (s.Window.Y == nil) {
 		report("window.x/y", "", "must be both set or both null", func() { s.Window.X, s.Window.Y = nil, nil })
+	}
+
+	// Each shortcut parses, and no two actions share one (compared parsed, so
+	// "Alt+Ctrl+P" and "Ctrl+Alt+P" are the same).
+	used := map[hotkey.Combo]string{}
+	defHotkeys := def.Hotkeys.Fields()
+	for i, f := range s.Hotkeys.Fields() {
+		if *f.Value == "" {
+			continue
+		}
+		field := "hotkeys." + f.Name
+		c, err := hotkey.Parse(*f.Value)
+		if err != nil {
+			report(field, *f.Value, err.Error(), func() { *f.Value = *defHotkeys[i].Value })
+			continue
+		}
+		if other, ok := used[c]; ok {
+			report(field, *f.Value, "is also hotkeys."+other, func() { *f.Value = "" })
+			continue
+		}
+		used[c] = f.Name
 	}
 
 	return problems

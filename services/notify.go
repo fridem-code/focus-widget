@@ -24,21 +24,35 @@ const PhaseEndToastID = "phase-end"
 type PhaseNotifier struct {
 	sender   ToastSender
 	settings *SettingsService
-	onError  func(error)
+	// focusToday counts today's finished focus sessions (T25).
+	focusToday func() int
+	onError    func(error)
 }
 
-// NewPhaseNotifier subscribes to the timer's transitions.
-func NewPhaseNotifier(t *timer.Timer, sender ToastSender, settings *SettingsService, onError func(error)) *PhaseNotifier {
-	n := &PhaseNotifier{sender: sender, settings: settings, onError: onError}
+// NewPhaseNotifier subscribes to the timer's transitions. Create it after the
+// StatsService: listeners run in the order they subscribed, so the session
+// that just ended is already counted by focusToday.
+func NewPhaseNotifier(t *timer.Timer, sender ToastSender, settings *SettingsService, focusToday func() int, onError func(error)) *PhaseNotifier {
+	n := &PhaseNotifier{sender: sender, settings: settings, focusToday: focusToday, onError: onError}
 	t.OnTransition(func(tr timer.Transition) {
+		if tr.Cause != timer.CauseExpire {
+			return
+		}
+		// Read now, in the listener: by the time a goroutine runs, the user
+		// may have changed the label for the next session.
+		s := settings.Get()
+		day := PhaseDay{Label: s.Timer.Label, Goal: s.Timer.DailyGoal}
+		if tr.From.Phase == timer.Focus && focusToday != nil {
+			day.Done = focusToday()
+		}
 		// Off the timer's goroutine: showing a toast must not delay timer events.
-		go n.notify(tr)
+		go n.notify(tr, day)
 	})
 	return n
 }
 
-func (n *PhaseNotifier) notify(tr timer.Transition) {
-	title, body, ok := PhaseEndMessage(tr)
+func (n *PhaseNotifier) notify(tr timer.Transition, day PhaseDay) {
+	title, body, ok := PhaseEndMessage(tr, day)
 	if !ok || !n.settings.Get().Notify.Toast {
 		return
 	}
@@ -52,14 +66,26 @@ func (n *PhaseNotifier) notify(tr timer.Transition) {
 	}
 }
 
+// PhaseDay is what the toast says beyond the timer: the label of the focus
+// (T24) and the day's progress towards the goal (T25, Goal 0 is no goal).
+type PhaseDay struct {
+	Label string
+	Done  int
+	Goal  int
+}
+
 // PhaseEndMessage returns the toast for a transition; ok is false for
 // anything but a phase running out (Start, Skip, Reset, … need no toast).
-func PhaseEndMessage(tr timer.Transition) (title, body string, ok bool) {
+// The focus that reaches the daily goal announces that instead of itself.
+func PhaseEndMessage(tr timer.Transition, day PhaseDay) (title, body string, ok bool) {
 	if tr.Cause != timer.CauseExpire {
 		return "", "", false
 	}
 	if tr.From.Phase == timer.Focus {
 		title = "Фокус завершён"
+		if day.Label != "" {
+			title += " · " + day.Label
+		}
 	} else {
 		title = "Перерыв окончен"
 	}
@@ -79,5 +105,18 @@ func PhaseEndMessage(tr timer.Transition) (title, body string, ok bool) {
 	} else {
 		body = "Дальше " + next + ". Нажмите «Старт», когда будете готовы"
 	}
+
+	if tr.From.Phase == timer.Focus && day.Goal > 0 && day.Done == day.Goal {
+		title = "Цель на день выполнена"
+		body = fmt.Sprintf("%d из %d %s за сегодня. %s", day.Done, day.Goal, pomodorosOf(day.Goal), body)
+	}
 	return title, body, true
+}
+
+// pomodorosOf is "помидор" after "из N": "из 1 помидора", "из 8 помидоров".
+func pomodorosOf(n int) string {
+	if n%10 == 1 && n%100 != 11 {
+		return "помидора"
+	}
+	return "помидоров"
 }
