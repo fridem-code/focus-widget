@@ -8,6 +8,7 @@ import (
 
 	"focuswidget/internal/config"
 	"focuswidget/internal/timer"
+	"focuswidget/internal/trayicon"
 )
 
 // TrayItem is the part of *application.MenuItem the tray relabels.
@@ -19,6 +20,8 @@ type TrayItem interface {
 // TrayUI is the tray icon and its menu.
 type TrayUI interface {
 	SetTooltip(string)
+	// SetRing shows the phase and the time left on the icon (T21).
+	SetRing(trayicon.Ring)
 	UpdateMenu()
 }
 
@@ -37,6 +40,7 @@ type TrayView struct {
 	Timer       string
 	Mode        string
 	AlwaysOnTop bool
+	Ring        trayicon.Ring
 }
 
 // Tray drives the system tray (docs/SPEC.md §3.5): it keeps the tooltip and
@@ -98,6 +102,9 @@ func (t *Tray) Refresh() {
 	if v == t.last {
 		return
 	}
+	if v.Ring != t.last.Ring {
+		t.ui.SetRing(v.Ring)
+	}
 	if v.Tooltip != t.last.Tooltip {
 		t.ui.SetTooltip(v.Tooltip)
 	}
@@ -112,13 +119,29 @@ func (t *Tray) Refresh() {
 	t.last = v
 }
 
-// BuildTrayView computes the tray texts.
+// TrayRing is the icon for the timer state: the phase and the time left,
+// rounded up to whole steps so the icon changes only now and then; the idle
+// icon (zero value) while no phase runs.
+func TrayRing(st timer.State) trayicon.Ring {
+	if st.Status != timer.Running && st.Status != timer.Paused || st.DurationMs <= 0 {
+		return trayicon.Ring{}
+	}
+	left := (st.RemainingMs*trayicon.Steps + st.DurationMs - 1) / st.DurationMs
+	return trayicon.Ring{
+		Phase:  string(st.Phase),
+		Left:   int(min(max(left, 0), trayicon.Steps)),
+		Paused: st.Status == timer.Paused,
+	}
+}
+
+// BuildTrayView computes the tray texts and icon.
 func BuildTrayView(st timer.State, s config.Settings, visible bool) TrayView {
 	v := TrayView{
 		Tooltip:     "Focus Widget · " + trayStatus(st),
 		Visibility:  "Показать",
 		Mode:        "Компактный режим",
 		AlwaysOnTop: s.Window.AlwaysOnTop,
+		Ring:        TrayRing(st),
 	}
 	if visible {
 		v.Visibility = "Скрыть"

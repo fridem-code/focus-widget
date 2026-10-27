@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"math"
+	"path/filepath"
 	"strings"
 )
 
@@ -50,6 +51,8 @@ type TimerSettings struct {
 	LongBreakEvery  int  `json:"longBreakEvery"`
 	AutoStartBreaks bool `json:"autoStartBreaks"`
 	AutoStartFocus  bool `json:"autoStartFocus"`
+	// PauseOnLock pauses a running focus phase while the PC is locked (T20).
+	PauseOnLock bool `json:"pauseOnLock"`
 }
 
 type MusicSettings struct {
@@ -60,6 +63,9 @@ type MusicSettings struct {
 	DuckVolume    int           `json:"duckVolume"`
 	GenreID       string        `json:"genreId"`
 	SourceIndex   int           `json:"sourceIndex"`
+	// LocalFolder is the user's music folder for the "Мои файлы" genre
+	// (T22); empty when none is chosen.
+	LocalFolder string `json:"localFolder"`
 }
 
 type WindowSettings struct {
@@ -94,6 +100,7 @@ func Default() Settings {
 			LongBreakEvery:  4,
 			AutoStartBreaks: true,
 			AutoStartFocus:  false,
+			PauseOnLock:     true,
 		},
 		Music: MusicSettings{
 			Volume:        50,
@@ -164,6 +171,9 @@ func (s *Settings) check(fix bool) []string {
 	default:
 		report("music.breakBehavior", m.BreakBehavior, "is not pause|duck|continue",
 			func() { m.BreakBehavior = def.Music.BreakBehavior })
+	}
+	if m.LocalFolder != "" && !filepath.IsAbs(m.LocalFolder) {
+		report("music.localFolder", m.LocalFolder, "is not an absolute path", func() { m.LocalFolder = "" })
 	}
 
 	switch s.Window.Mode {

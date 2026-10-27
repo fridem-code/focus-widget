@@ -120,7 +120,8 @@ export function mountCatalogCheck() {
       const catalog = await MusicService.Genres()
       list = (catalog.genres ?? []).flatMap((g) =>
         (g.sources ?? [])
-          .filter((s) => s.type !== 'noise') // generated in the page, nothing to check on YouTube
+          // Noise is generated in the page and files are the user's: neither is on YouTube.
+          .filter((s) => s.type === 'playlist' || s.type === 'video')
           .map((s) => ({ genre: g.id, type: s.type, id: s.id, title: s.title }) as CheckSource),
       )
     }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import type { Genre } from '../../bindings/focuswidget/internal/catalog/models'
 import {
   BreakBehavior,
@@ -20,6 +20,8 @@ const props = defineProps<{
   save: (patch: SettingsPatch) => Promise<string | null>
   /** Starting with Windows (T19): kept by Windows, not in the settings. */
   autostart: { enabled: () => Promise<boolean>; set: (on: boolean) => Promise<void> }
+  /** The music folder for "Мои файлы" (T22): choose resolves to the folder, "" if cancelled. */
+  musicFolder: { choose: () => Promise<string>; clear: () => Promise<void> }
 }>()
 const emit = defineEmits<{
   back: []
@@ -37,6 +39,21 @@ const autostartOn = ref<boolean | null>(null)
 onMounted(async () => {
   autostartOn.value = await props.autostart.enabled().catch(() => null)
 })
+
+// The folder's own name; the full path is in the tooltip.
+const folderName = computed(() => {
+  const path = props.settings.music.localFolder
+  return path ? (path.split(/[\\/]/).filter(Boolean).pop() ?? path) : ''
+})
+
+async function folderAction(action: () => Promise<unknown>) {
+  try {
+    await action()
+    saveError.value = null
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : String(err)
+  }
+}
 
 async function setAutostart(on: boolean) {
   try {
@@ -143,6 +160,11 @@ const sessions = (n: number) => plural(n, 'сессия', 'сессии', 'се�
           :value="settings.timer.autoStartFocus"
           @toggle="set({ autoStartFocus: $event })"
         />
+        <SettingSwitch
+          label="Пауза при блокировке ПК"
+          :value="settings.timer.pauseOnLock"
+          @toggle="set({ pauseOnLock: $event })"
+        />
       </section>
 
       <section aria-labelledby="s-music">
@@ -171,8 +193,42 @@ const sessions = (n: number) => plural(n, 'сессия', 'сессии', 'се�
             <option v-for="g in genres" :key="g.id" :value="g.id">{{ g.name }}</option>
           </select>
         </div>
+        <div class="row">
+          <span id="s-folder">Папка с музыкой</span>
+          <div class="folder" role="group" aria-labelledby="s-folder">
+            <span
+              class="folder-name"
+              :class="{ none: !folderName }"
+              :title="settings.music.localFolder || undefined"
+              >{{ folderName || 'не выбрана' }}</span
+            >
+            <button class="pick" type="button" @click="folderAction(musicFolder.choose)">
+              Выбрать…
+            </button>
+            <button
+              v-if="folderName"
+              class="icon-button small"
+              type="button"
+              aria-label="Забыть папку"
+              @click="folderAction(musicFolder.clear)"
+            >
+              <svg
+                aria-hidden="true"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+        </div>
         <SettingSwitch
-          label="Перемешивать плейлисты"
+          label="Перемешивать треки"
           :value="settings.music.shuffle"
           @toggle="set({ shuffle: $event })"
         />
@@ -300,6 +356,43 @@ select {
   background: var(--field-bg);
   color: var(--text);
   font: inherit;
+}
+
+.folder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.folder-name {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.folder-name.none {
+  color: var(--text-muted);
+}
+
+.pick {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-s);
+  background: var(--field-bg);
+  color: var(--text);
+}
+
+.pick:hover {
+  background: var(--surface-hover);
+}
+
+.icon-button.small {
+  width: 26px;
+  height: 26px;
 }
 
 select option {

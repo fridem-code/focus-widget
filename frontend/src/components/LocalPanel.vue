@@ -1,19 +1,20 @@
 <script setup lang="ts">
-defineProps<{ title: string; playing: boolean }>()
+defineProps<{ title: string; note: string; playing: boolean }>()
 
 // Bar heights of the level meter, as fractions of its height.
 const bars = [0.45, 0.8, 0.6, 1, 0.7, 0.5, 0.85, 0.4, 0.65]
 </script>
 
-<!-- Stands where the YouTube player would be while generated noise plays (T17):
-     there is no video, so it says what plays and that it needs no network. -->
+<!-- Stands where the YouTube player would be while music plays in the page:
+     generated noise (T17) or the user's files (T22). There is no video, so it
+     says what plays and that it needs no network. -->
 <template>
   <div class="noise" :class="{ playing }">
     <div class="meter" aria-hidden="true">
       <span v-for="(h, i) in bars" :key="i" :style="{ '--h': h }"></span>
     </div>
     <div class="title">{{ title }}</div>
-    <div class="note">Звучит прямо из виджета — без YouTube и интернета</div>
+    <div class="note">{{ note }}</div>
   </div>
 </template>
 

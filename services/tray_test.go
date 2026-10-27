@@ -10,6 +10,7 @@ import (
 
 	"focuswidget/internal/config"
 	"focuswidget/internal/timer"
+	"focuswidget/internal/trayicon"
 )
 
 // The fakes are locked: the tray refreshes from its own goroutines.
@@ -43,6 +44,13 @@ type fakeTrayUI struct {
 	mu       sync.Mutex
 	tooltips []string
 	updates  int
+	rings    []trayicon.Ring
+}
+
+func (u *fakeTrayUI) SetRing(r trayicon.Ring) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.rings = append(u.rings, r)
 }
 
 func (u *fakeTrayUI) SetTooltip(s string) {
@@ -233,5 +241,54 @@ func TestTrayWindowCommands(t *testing.T) {
 	f.tray.Quit()
 	if f.win.quits != 1 {
 		t.Fatal("quit")
+	}
+}
+
+// T21: the icon shows the phase and the time left in whole steps.
+func TestTrayRing(t *testing.T) {
+	st := func(phase timer.Phase, status timer.Status, remaining, duration int64) timer.State {
+		return timer.State{Phase: phase, Status: status, RemainingMs: remaining, DurationMs: duration}
+	}
+	tests := []struct {
+		name  string
+		state timer.State
+		want  trayicon.Ring
+	}{
+		{"idle: the app icon", st(timer.Focus, timer.Idle, 1500_000, 1500_000), trayicon.Ring{}},
+		{"just started: full", st(timer.Focus, timer.Running, 1500_000, 1500_000), trayicon.Ring{Phase: "focus", Left: 60}},
+		{"half way", st(timer.Focus, timer.Running, 750_000, 1500_000), trayicon.Ring{Phase: "focus", Left: 30}},
+		{"a moment in still shows full", st(timer.Focus, timer.Running, 1499_000, 1500_000), trayicon.Ring{Phase: "focus", Left: 60}},
+		{"last second keeps a sliver", st(timer.Focus, timer.Running, 1000, 1500_000), trayicon.Ring{Phase: "focus", Left: 1}},
+		{"paused break", st(timer.ShortBreak, timer.Paused, 150_000, 300_000), trayicon.Ring{Phase: "short_break", Left: 30, Paused: true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := TrayRing(tt.state); got != tt.want {
+				t.Fatalf("TrayRing = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTrayRedrawsTheIconOnlyWhenTheRingChanges(t *testing.T) {
+	f := newTray(t)
+	if len(f.ui.rings) != 0 {
+		t.Fatalf("idle attach drew %v; the exe icon should stay", f.ui.rings)
+	}
+	f.tray.ToggleTimer() // start
+	f.tray.Refresh()
+	f.tray.Refresh()
+	if len(f.ui.rings) != 1 || f.ui.rings[0] != (trayicon.Ring{Phase: "focus", Left: 60}) {
+		t.Fatalf("rings after start = %v", f.ui.rings)
+	}
+	f.tray.ToggleTimer() // pause
+	f.tray.Refresh()
+	if last := f.ui.rings[len(f.ui.rings)-1]; !last.Paused {
+		t.Fatalf("rings after pause = %v", f.ui.rings)
+	}
+	f.tray.ResetCycle()
+	f.tray.Refresh()
+	if last := f.ui.rings[len(f.ui.rings)-1]; last != (trayicon.Ring{}) {
+		t.Fatalf("rings after reset = %v, want back to the idle icon", f.ui.rings)
 	}
 }

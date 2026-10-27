@@ -10,6 +10,7 @@ import {
   genreLabel,
   nextGenre,
   nextPlayableSource,
+  randomPlayableSource,
   position,
   resolveGenre,
 } from './music'
@@ -82,5 +83,22 @@ describe('position and label', () => {
     expect(clampSource(genre, 2)).toBe(2)
     expect(clampSource(genre, 7)).toBe(0)
     expect(clampSource(genre, -1)).toBe(0)
+  })
+})
+
+describe('randomPlayableSource', () => {
+  const genre = (n: number): Genre => ({
+    id: 'local',
+    name: 'Мои файлы',
+    sources: [...Array(n).keys()].map((i) => ({ type: SourceType.SourceFile, id: String(i) })),
+  })
+  it('picks another working source at random', () => {
+    expect(randomPlayableSource(genre(4), 1, new Set([2]), () => 0)).toBe(0)
+    expect(randomPlayableSource(genre(4), 1, new Set([2]), () => 0.99)).toBe(3)
+  })
+  it('stays on the only working source, or gives up', () => {
+    expect(randomPlayableSource(genre(2), 0, new Set([1]), () => 0.5)).toBe(0)
+    expect(randomPlayableSource(genre(2), 0, new Set([0, 1]))).toBeNull()
+    expect(randomPlayableSource(genre(0), 0, new Set())).toBeNull()
   })
 })

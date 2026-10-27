@@ -5,16 +5,19 @@ package app
 import (
 	"fmt"
 	"io/fs"
+	"net/http"
 	"os"
 	"slices"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 
 	"focuswidget/internal/autostart"
 	"focuswidget/internal/catalog"
 	"focuswidget/internal/config"
 	"focuswidget/internal/foreground"
+	"focuswidget/internal/session"
 	"focuswidget/internal/timer"
 	"focuswidget/services"
 )
@@ -60,6 +63,17 @@ func New(assets fs.FS) (*application.App, error) {
 	// Registers the app with Windows (HKCU AppUserModelId + COM activator) on
 	// startup; T13's uninstaller removes those keys (docs/spike-results.md §6).
 	toasts := notifications.New()
+	timerService := services.NewTimerService(t, emitter)
+	// The folder dialog belongs to the widget window, so it opens above it
+	// rather than behind an always-on-top widget.
+	musicService := services.NewMusicService(genres, settingsService, func() (string, error) {
+		return wailsApp.Dialog.OpenFile().
+			SetTitle("Папка с музыкой").
+			CanChooseFiles(false).
+			CanChooseDirectories(true).
+			AttachToWindow(mainWindow).
+			PromptForSingleSelection()
+	})
 	// Started by Windows: the first show keeps the focus where it is (T19).
 	var quietShow func(show func())
 	if slices.Contains(os.Args[1:], autostart.Flag) {
@@ -85,15 +99,17 @@ func New(assets fs.FS) (*application.App, error) {
 			OnSecondInstanceLaunch: func(application.SecondInstanceData) { windowService.Show() },
 		},
 		Services: []application.Service{
-			application.NewService(services.NewTimerService(t, emitter)),
+			application.NewService(timerService),
 			application.NewService(settingsService),
-			application.NewService(services.NewMusicService(genres, settingsService)),
+			application.NewService(musicService),
 			application.NewService(windowService),
 			application.NewService(autostartService),
 			application.NewService(toasts),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
+			// The music folder's files, for "Мои файлы" (T22).
+			Middleware: func(next http.Handler) http.Handler { return services.LocalMusic(musicService, next) },
 		},
 		Windows: application.WindowsOptions{
 			// Without this flag WebView2 blocks unmuted playVideo() when the page has
@@ -157,7 +173,34 @@ func New(assets fs.FS) (*application.App, error) {
 	services.NewPhaseNotifier(t, toasts, settingsService, func(err error) {
 		logger.Warn("phase-end toast failed", "err", err)
 	})
-	toasts.OnNotificationResponse(func(notifications.NotificationResult) { windowService.Show() })
+	// Pause a running focus while the PC is locked; after the unlock a toast
+	// offers to resume it (T20). Its button needs a category, which can only be
+	// registered once the notification service has started.
+	lockPauser := services.NewLockPauser(timerService, settingsService, toasts, func(err error) {
+		logger.Warn("focus-paused toast failed", "err", err)
+	})
+	wailsApp.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+		if err := toasts.RegisterNotificationCategory(services.FocusPausedToastCategory()); err != nil {
+			logger.Warn("register the focus-paused toast", "err", err)
+		}
+	})
+	if stop, err := session.Watch(lockPauser.SessionChanged); err != nil {
+		logger.Warn("watch session locks", "err", err)
+	} else {
+		wailsApp.OnShutdown(stop)
+	}
+
+	// "Продолжить" on the focus-paused toast resumes; any other click on our
+	// toasts brings the window back.
+	toasts.OnNotificationResponse(func(r notifications.NotificationResult) {
+		if r.Response.ActionIdentifier == services.ResumeAction {
+			if err := timerService.Resume(); err != nil {
+				logger.Warn("resume from the toast", "err", err)
+			}
+			return
+		}
+		windowService.Show()
+	})
 
 	return wailsApp, nil
 }

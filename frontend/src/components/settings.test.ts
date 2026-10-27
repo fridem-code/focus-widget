@@ -28,6 +28,7 @@ const settings = (): Settings => ({
     longBreakEvery: 4,
     autoStartBreaks: false,
     autoStartFocus: false,
+    pauseOnLock: true,
   },
   music: {
     volume: 60,
@@ -37,6 +38,7 @@ const settings = (): Settings => ({
     duckVolume: 20,
     genreId: 'lofi',
     sourceIndex: 0,
+    localFolder: '',
   },
   window: {
     mode: WindowMode.WindowExpanded,
@@ -68,10 +70,14 @@ function mountPanel(initial = settings(), result: string | null = null) {
       autostart.on = on
     }),
   }
+  const musicFolder = {
+    choose: vi.fn(async () => 'D:\\Music\\Focus'),
+    clear: vi.fn(async () => {}),
+  }
   const wrapper = mount(SettingsPanel, {
-    props: { settings: initial, genres, genreId: 'lofi', save, autostart },
+    props: { settings: initial, genres, genreId: 'lofi', save, autostart, musicFolder },
   })
-  return { wrapper, saved, save, autostart }
+  return { wrapper, saved, save, autostart, musicFolder }
 }
 
 const flush = () => new Promise((r) => setTimeout(r))
@@ -147,6 +153,29 @@ describe('SettingsPanel', () => {
     await switchButton(wrapper, 'Уведомление Windows').trigger('click')
     await flush()
     expect(saved).toEqual([{ autoStartBreaks: true }, { toast: false }])
+  })
+
+  it('shows the music folder by name and chooses or forgets it', async () => {
+    const { wrapper, musicFolder } = mountPanel()
+    expect(wrapper.get('.folder-name').text()).toBe('не выбрана')
+    expect(wrapper.find('button[aria-label="Забыть папку"]').exists()).toBe(false)
+    await wrapper.get('button.pick').trigger('click')
+    expect(musicFolder.choose).toHaveBeenCalledOnce()
+
+    const withFolder = settings()
+    withFolder.music.localFolder = 'D:\\Music\\Focus'
+    await wrapper.setProps({ settings: withFolder })
+    expect(wrapper.get('.folder-name').text()).toBe('Focus')
+    expect(wrapper.get('.folder-name').attributes('title')).toBe('D:\\Music\\Focus')
+    await wrapper.get('button[aria-label="Забыть папку"]').trigger('click')
+    expect(musicFolder.clear).toHaveBeenCalledOnce()
+  })
+
+  it('switches the pause on lock', async () => {
+    const { wrapper, saved } = mountPanel()
+    await switchButton(wrapper, 'Пауза при блокировке ПК').trigger('click')
+    await flush()
+    expect(saved).toEqual([{ pauseOnLock: false }])
   })
 
   it('saves the break behaviour', async () => {

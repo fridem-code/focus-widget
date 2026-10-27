@@ -46,6 +46,7 @@ type SettingsPatch struct {
 	LongBreakEvery  *int                  `json:"longBreakEvery,omitempty"`
 	AutoStartBreaks *bool                 `json:"autoStartBreaks,omitempty"`
 	AutoStartFocus  *bool                 `json:"autoStartFocus,omitempty"`
+	PauseOnLock     *bool                 `json:"pauseOnLock,omitempty"`
 	Shuffle         *bool                 `json:"shuffle,omitempty"`
 	BreakBehavior   *config.BreakBehavior `json:"breakBehavior,omitempty"`
 	DuckVolume      *int                  `json:"duckVolume,omitempty"`
@@ -66,6 +67,7 @@ func (s *SettingsService) Patch(p SettingsPatch) (config.Settings, error) {
 		set(&cur.Timer.LongBreakEvery, p.LongBreakEvery)
 		set(&cur.Timer.AutoStartBreaks, p.AutoStartBreaks)
 		set(&cur.Timer.AutoStartFocus, p.AutoStartFocus)
+		set(&cur.Timer.PauseOnLock, p.PauseOnLock)
 		set(&cur.Music.Shuffle, p.Shuffle)
 		set(&cur.Music.BreakBehavior, p.BreakBehavior)
 		set(&cur.Music.DuckVolume, p.DuckVolume)
@@ -97,7 +99,8 @@ func (s *SettingsService) modify(change func(*config.Settings)) (config.Settings
 	if err := s.store.Save(next); err != nil { // Save validates first
 		return s.current, err
 	}
-	timerChanged := next.Timer != s.current.Timer
+	// Only what the timer itself uses: not, say, pauseOnLock.
+	timerChanged := TimerConfig(next.Timer) != TimerConfig(s.current.Timer)
 	s.current = next
 
 	if timerChanged {

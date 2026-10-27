@@ -14,6 +14,12 @@ const content = computed(() => {
         text: `Все видео жанра «${props.genreName}» сейчас недоступны для встраивания. Таймер продолжает работать.`,
         action: 'Выбрать другой жанр',
       }
+    case 'no_files':
+      return {
+        title: 'В папке нет музыки',
+        text: 'Папка пуста, недоступна или в ней нет файлов mp3, m4a, aac, ogg, opus, flac, wav. Другую папку можно выбрать в настройках. Таймер продолжает работать.',
+        action: 'Выбрать другой жанр',
+      }
     case 'offline':
       return {
         title: 'Нет подключения к интернету',
@@ -30,7 +36,7 @@ const content = computed(() => {
 })
 
 function onAction() {
-  if (props.kind === 'no_videos') emit('chooseGenre')
+  if (props.kind === 'no_videos' || props.kind === 'no_files') emit('chooseGenre')
   else emit('retry')
 }
 </script>

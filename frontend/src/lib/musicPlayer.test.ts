@@ -397,7 +397,7 @@ describe('generated noise (T17)', () => {
 
   it('plays without creating the YouTube player', async () => {
     const music = setupNoise()
-    expect(music.state.generated).toBe(true)
+    expect(music.state.local).toBe('noise')
     music.play()
     await flush()
     expect(noise.kind).toBe('white')
@@ -443,7 +443,7 @@ describe('generated noise (T17)', () => {
     music.selectGenre('lofi')
     expect(noise.kind).toBeNull()
     expect(music.state.playing).toBe(false)
-    expect(music.state.generated).toBe(false)
+    expect(music.state.local).toBeNull()
     await flush()
     expect(factory).not.toHaveBeenCalled()
     music.setShown(true)
@@ -545,5 +545,140 @@ describe('fades (T18)', () => {
     expect(volumes().at(-1)).toBe(10)
     vi.advanceTimersByTime(DUCK_GLIDE_MS)
     expect(volumes().at(-1)).toBe(10)
+  })
+})
+
+class FakeFiles {
+  url: string | null = null
+  paused = false
+  volume = -1
+  log: string[] = []
+  handlers = { ended: () => {}, failed: () => {} }
+  on = (h: { ended(): void; failed(): void }) => {
+    this.handlers = h
+  }
+  play = (url: string) => {
+    this.url = url
+    this.paused = false
+    this.log.push(`play ${url}`)
+  }
+  pause = () => {
+    if (this.url) this.paused = true
+  }
+  stop = () => {
+    if (this.url) this.log.push('stop')
+    this.url = null
+  }
+  setVolume = (v: number) => {
+    this.volume = v
+  }
+  current = () => this.url
+}
+
+describe('the user’s files (T22)', () => {
+  const file = (id: string) => ({ type: SourceType.SourceFile, id, title: `track ${id}` })
+  const folder = (n: number): Catalog => ({
+    genres: [
+      ...catalog.genres!,
+      { id: 'local', name: 'Мои файлы', sources: [...Array(n).keys()].map((i) => file(String(i))) },
+    ],
+  })
+  let files: FakeFiles
+
+  function setupFiles(cat = folder(3), over: Partial<MusicConfig> = {}) {
+    files = new FakeFiles()
+    const music = createMusicPlayer({
+      factory: factory as never,
+      noise: {
+        play: () => {},
+        stop: () => {},
+        setVolume: () => {},
+        playing: () => null,
+        dispose: () => {},
+      } as never,
+      files: files as never,
+      isOnline: () => online,
+      target: target as Window,
+    })
+    music.configure(config({ catalog: cat, genreId: 'local', shuffle: false, ...over }))
+    music.attach(document.createElement('div'))
+    return music
+  }
+
+  it('plays the files in order without YouTube, also while hidden', async () => {
+    const music = setupFiles()
+    expect(music.state.local).toBe('file')
+    music.setShown(false)
+    music.play()
+    await flush()
+    expect(files.url).toBe('/local-music/0')
+    expect(music.state.playing).toBe(true)
+    expect(factory).not.toHaveBeenCalled()
+
+    files.handlers.ended()
+    expect(files.url).toBe('/local-music/1')
+    expect(music.state.title).toBe('track 1')
+    music.nextTrack()
+    expect(files.url).toBe('/local-music/2')
+  })
+
+  it('shuffles the order when shuffle is on', () => {
+    const music = setupFiles(folder(3), { shuffle: true })
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    music.play()
+    files.handlers.ended()
+    expect(files.url).toBe('/local-music/2') // the last of the others (1, 2)
+    random.mockRestore()
+  })
+
+  it('pauses where it is and resumes there', () => {
+    const music = setupFiles()
+    music.play()
+    music.pause()
+    expect(files.paused).toBe(true)
+    expect(music.state.playing).toBe(false)
+    music.play()
+    expect(files.log).toEqual(['play /local-music/0', 'play /local-music/0'])
+  })
+
+  it('follows the volume, mute and duck', () => {
+    const music = setupFiles(folder(2), { volume: 40 })
+    expect(files.volume).toBeCloseTo(0.4)
+    music.setDuck(20)
+    expect(files.volume).toBeCloseTo(0.2)
+    music.setMuted(true)
+    expect(files.volume).toBe(0)
+  })
+
+  it('skips a file that fails and reports when none can play', () => {
+    const music = setupFiles(folder(2))
+    music.play()
+    files.handlers.failed()
+    expect(files.url).toBe('/local-music/1')
+    files.handlers.failed()
+    expect(music.state.error).toBe('no_files')
+    expect(music.state.playing).toBe(false)
+  })
+
+  it('reports an empty folder and creates no YouTube player', async () => {
+    const music = setupFiles(folder(0))
+    expect(music.state.error).toBe('no_files')
+    music.play()
+    await flush()
+    expect(factory).not.toHaveBeenCalled()
+  })
+
+  it('starts over when the folder changes and moves on when it is gone', () => {
+    const music = setupFiles(folder(3), { sourceIndex: 2 })
+    music.play()
+    expect(files.url).toBe('/local-music/2')
+    music.setCatalog(folder(2)) // a smaller folder: index 2 no longer exists
+    expect(files.log.slice(-2)).toEqual(['stop', 'play /local-music/0'])
+    expect(music.state.sourceIndex).toBe(0)
+
+    music.setCatalog(catalog) // folder cleared
+    expect(music.state.genreId).toBe('noise') // the first genre
+    expect(music.state.local).toBeNull()
+    expect(files.url).toBeNull()
   })
 })

@@ -127,14 +127,14 @@ func TestTimerServiceForwardsEvents(t *testing.T) {
 func TestMusicServiceGenres(t *testing.T) {
 	settings, _, _, _ := newSettingsService(t)
 	c := catalog.Default()
-	if got := NewMusicService(c, settings).Genres(); !reflect.DeepEqual(got, c) {
+	if got := NewMusicService(c, settings, nil).Genres(); !reflect.DeepEqual(got, c) {
 		t.Fatalf("Genres() = %+v, want %+v", got, c)
 	}
 }
 
 func TestMusicServiceSelect(t *testing.T) {
 	settings, store, _, emit := newSettingsService(t)
-	svc := NewMusicService(catalog.Default(), settings)
+	svc := NewMusicService(catalog.Default(), settings, nil)
 
 	if err := svc.Select("classical", 1); err != nil {
 		t.Fatal(err)
@@ -162,7 +162,7 @@ func TestMusicServiceSelect(t *testing.T) {
 
 func TestMusicServiceSaveVolume(t *testing.T) {
 	settings, store, _, _ := newSettingsService(t)
-	svc := NewMusicService(catalog.Default(), settings)
+	svc := NewMusicService(catalog.Default(), settings, nil)
 	before := settings.Get()
 
 	if err := svc.SaveVolume(15, true); err != nil {
@@ -317,7 +317,7 @@ func TestSettingsPatchChangesOnlyGivenFields(t *testing.T) {
 
 func TestSettingsPatchKeepsChangesMadeMeanwhile(t *testing.T) {
 	svc, _, _, _ := newSettingsService(t)
-	music := NewMusicService(catalog.Default(), svc)
+	music := NewMusicService(catalog.Default(), svc, nil)
 
 	// The screen's patch follows a volume save it hasn't seen yet.
 	if err := music.SaveVolume(15, false); err != nil {

@@ -34,6 +34,7 @@ import {
 } from './composables/useSettings'
 import { useTimer } from './composables/useTimer'
 import { useWindowActive } from './composables/useWindowActive'
+import { LOCAL_GENRE_ID } from './lib/music'
 import { persistMusic } from './lib/persistMusic'
 import type { MusicPolicyRunner } from './lib/policyRunner'
 import { createWindowMode, type WindowModeController } from './lib/windowMode'
@@ -64,6 +65,25 @@ const autostart = {
   enabled: () => AutostartService.Enabled(),
   set: (on: boolean) => AutostartService.Set(on),
 }
+// The music folder of "Мои файлы" (T22) and the folder the catalog was last
+// built for, so the settings:changed after a choice does not rescan it again.
+let catalogFolder = ''
+async function reloadCatalog(folder: string) {
+  catalogFolder = folder
+  music.setCatalog(await MusicService.Genres())
+}
+const musicFolder = {
+  // Choosing a folder also switches to its music.
+  async choose() {
+    const folder = await MusicService.ChooseFolder()
+    if (folder) {
+      await reloadCatalog(folder)
+      music.selectGenre(LOCAL_GENRE_ID)
+    }
+    return folder
+  },
+  clear: () => MusicService.ClearFolder(),
+}
 
 onMounted(async () => {
   const [catalog, settings] = await Promise.all([MusicService.Genres(), SettingsService.Get()])
@@ -85,6 +105,13 @@ onMounted(async () => {
   watch(
     () => settingsStore.settings.value.music.shuffle,
     (on) => music.setShuffle(on),
+  )
+  catalogFolder = settings.music.localFolder
+  watch(
+    () => settingsStore.settings.value.music.localFolder,
+    (folder) => {
+      if (folder !== catalogFolder) void reloadCatalog(folder)
+    },
   )
 
   music.configure({
@@ -202,6 +229,7 @@ function setAlwaysOnTop(on: boolean) {
       :genre-id="music.state.genreId"
       :save="store.patch"
       :autostart="autostart"
+      :music-folder="musicFolder"
       @back="screen = 'timer'"
       @hide="WindowService.Hide()"
       @genre="music.selectGenre($event)"

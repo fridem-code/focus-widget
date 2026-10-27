@@ -7,7 +7,11 @@ import {
   type Source,
 } from '../../bindings/focuswidget/internal/catalog/models'
 
-export type PlayerErrorKind = 'no_videos' | 'offline' | 'config'
+/** `no_files`: "Мои файлы" has nothing it can play (empty or gone folder, T22). */
+export type PlayerErrorKind = 'no_videos' | 'no_files' | 'offline' | 'config'
+
+/** The genre of the user's music folder (Go: services.LocalGenreID). */
+export const LOCAL_GENRE_ID = 'local'
 
 export interface PlaylistPosition {
   index: number // 0-based
@@ -56,6 +60,22 @@ export function nextPlayableSource(
     if (!broken.has(i)) return i
   }
   return null
+}
+
+/**
+ * A random source other than `from` that is not known to be broken; `from`
+ * itself when it is the only one left, null when every source is broken.
+ */
+export function randomPlayableSource(
+  genre: Genre,
+  from: number,
+  broken: ReadonlySet<number>,
+  random: () => number = Math.random,
+): number | null {
+  const n = sources(genre).length
+  const others = [...Array(n).keys()].filter((i) => i !== from && !broken.has(i))
+  if (others.length) return others[Math.floor(random() * others.length)]
+  return n > 0 && from < n && !broken.has(from) ? from : null
 }
 
 /** Clamp a saved source index to the genre (the catalog may have changed). */

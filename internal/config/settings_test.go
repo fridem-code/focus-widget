@@ -39,6 +39,8 @@ func TestValidateAndNormalize(t *testing.T) {
 			func(s Settings) bool { return s.Music.SourceIndex == 0 }},
 		{"break behavior", func(s *Settings) { s.Music.BreakBehavior = "louder" }, "music.breakBehavior",
 			func(s Settings) bool { return s.Music.BreakBehavior == BreakPause }},
+		{"relative music folder", func(s *Settings) { s.Music.LocalFolder = `Music\focus` }, "music.localFolder",
+			func(s Settings) bool { return s.Music.LocalFolder == "" }},
 		{"window mode", func(s *Settings) { s.Window.Mode = "fullscreen" }, "window.mode",
 			func(s Settings) bool { return s.Window.Mode == WindowExpanded }},
 		{"theme", func(s *Settings) { s.Window.Theme = "sepia" }, "window.theme",

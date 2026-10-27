@@ -1,23 +1,27 @@
 // Music controller (docs/SPEC.md §3.2, §3.4, §3.7) over two kinds of source:
 // the YouTube player (lazy creation, source/genre switching, error skipping,
-// offline recovery) and noise generated in the page (T17).
+// offline recovery) and music that plays in the page: generated noise (T17)
+// and the user's own files (T22).
 //
 // `wanted` is whether the user wants music; the timer policy (T8) sets it.
 // Whether it is heard is decided here: YouTube only plays while its player is
 // shown (SPEC §2: not in compact mode, in the tray or behind the settings), so
-// a hidden player waits and resumes once shown; generated noise has no player
-// and plays either way.
+// a hidden player waits and resumes once shown; music that plays in the page
+// has no player and plays either way.
 import { reactive, readonly } from 'vue'
 import { SourceType, type Catalog } from '../../bindings/focuswidget/internal/catalog/models'
 import {
   clampSource,
   classifyError,
+  LOCAL_GENRE_ID,
   nextGenre,
   nextPlayableSource,
+  randomPlayableSource,
   resolveGenre,
   type PlayerErrorKind,
   type PlaylistPosition,
 } from './music'
+import { createFilePlayer, type FilePlayer } from './filePlayer'
 import { createNoise, type NoiseKind, type NoisePlayer } from './noise'
 import { createYouTubePlayer, YTState, type PlayerFactory, type YTPlayer } from './youtube'
 
@@ -33,6 +37,7 @@ export interface MusicConfig {
 export interface MusicDeps {
   factory?: PlayerFactory
   noise?: NoisePlayer
+  files?: FilePlayer
   isOnline?: () => boolean
   target?: Pick<Window, 'addEventListener' | 'removeEventListener'>
 }
@@ -60,6 +65,7 @@ const GLIDE_STEP_MS = 50
 export function createMusicPlayer(deps: MusicDeps = {}) {
   const factory = deps.factory ?? createYouTubePlayer
   const noise = deps.noise ?? createNoise()
+  const files = deps.files ?? createFilePlayer()
   const isOnline = deps.isOnline ?? (() => navigator.onLine)
   const target = deps.target ?? window
 
@@ -73,8 +79,11 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     playing: false,
     /** The YouTube player can be seen; a hidden one must not play (SPEC §2). */
     shown: true,
-    /** The current source is noise generated in the page, not YouTube. */
-    generated: false,
+    /**
+     * What plays in the page instead of YouTube: generated noise, or the
+     * user's files (also for "Мои файлы" with no files); null for YouTube.
+     */
+    local: null as 'noise' | 'file' | null,
     error: null as PlayerErrorKind | null,
     errorCode: null as number | null,
     title: '',
@@ -110,7 +119,10 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
   /** Call after the genre or source changed. */
   function sourceChanged() {
     const src = source()
-    state.generated = src?.type === SourceType.SourceNoise
+    if (src?.type === SourceType.SourceNoise) state.local = 'noise'
+    else if (src?.type === SourceType.SourceFile || genre()?.id === LOCAL_GENRE_ID)
+      state.local = 'file'
+    else state.local = null
     state.title = src?.title ?? ''
     state.playlist = null
   }
@@ -119,7 +131,7 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     state.error = kind
     state.errorCode = code
     state.playing = false
-    if (kind !== 'no_videos') player?.pauseVideo()
+    if (kind !== 'no_videos' && kind !== 'no_files') player?.pauseVideo()
   }
 
   function clearError() {
@@ -127,16 +139,37 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     state.errorCode = null
   }
 
-  /** Starts, switches or stops the generated noise to match `wanted`. */
-  function syncNoise() {
-    if (state.generated && state.wanted) {
-      noise.play(source()!.id as NoiseKind)
+  /**
+   * Starts, switches or pauses the music that plays in the page (noise or a
+   * file) to match `wanted`. A paused file resumes where it stopped.
+   */
+  function syncLocal() {
+    const src = source()
+    if (state.local && !src) {
+      stopLocal()
+      return setError('no_files')
+    }
+    if (state.local && src && state.wanted) {
+      if (src.type === SourceType.SourceNoise) {
+        files.stop()
+        noise.play(src.id as NoiseKind)
+      } else {
+        noise.stop()
+        files.play(fileUrl(src.id))
+      }
       state.playing = true
       startFadeIn()
     } else {
       noise.stop()
-      if (state.generated) state.playing = false
+      files.pause()
+      if (state.local) state.playing = false
     }
+  }
+
+  /** Stops noise and files for good (leaving them for YouTube, a new folder). */
+  function stopLocal() {
+    noise.stop()
+    files.stop()
   }
 
   async function ensurePlayer() {
@@ -158,15 +191,15 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
   }
 
   /** Should the YouTube player be playing right now? */
-  const youTubeAudible = () => state.wanted && state.shown && !state.generated
+  const youTubeAudible = () => state.wanted && state.shown && !state.local
 
   function loadCurrent() {
-    if (state.generated) {
+    if (state.local) {
       player?.pauseVideo()
-      return syncNoise()
+      return syncLocal()
     }
-    if (noise.playing()) {
-      noise.stop()
+    if (noise.playing() || files.current()) {
+      stopLocal()
       state.playing = false // until YouTube reports that it plays
     }
     if (!player || !state.ready) return
@@ -195,11 +228,16 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     if (state.ready && !state.error) player.playVideo()
   }
 
-  /** Move to the next working source of the genre, or report that none is left. */
+  /**
+   * Move to the next working source of the genre, or report that none is
+   * left. With shuffle on, the user's files go in random order (YouTube
+   * playlists shuffle themselves).
+   */
   function advance(code: number | null = null) {
     const g = genre()
-    const next = g ? nextPlayableSource(g, state.sourceIndex, broken) : null
-    if (next === null) return setError('no_videos', code)
+    const pick = shuffle && state.local === 'file' ? randomPlayableSource : nextPlayableSource
+    const next = g ? pick(g, state.sourceIndex, broken) : null
+    if (next === null) return setError(state.local === 'file' ? 'no_files' : 'no_videos', code)
     state.sourceIndex = next
     sourceChanged()
     loadCurrent()
@@ -209,10 +247,11 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
   const targetVolume = () =>
     state.duck === null ? state.volume : Math.min(state.duck, state.volume)
 
-  /** Sends a volume to what plays: the noise gain and the YouTube player. */
+  /** Sends a volume to what plays: the noise, the file and the YouTube player. */
   function output(v: number) {
     heard = v
     noise.setVolume(state.muted ? 0 : v / 100)
+    files.setVolume(state.muted ? 0 : v / 100)
     if (player && state.ready) player.setVolume(Math.round(v))
   }
 
@@ -270,7 +309,7 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     fadingOut = false
     stopGlide()
     player?.pauseVideo()
-    syncNoise()
+    syncLocal()
   }
 
   function updateTrackInfo() {
@@ -292,8 +331,8 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
   }
 
   function onStateChange(s: number) {
-    // While noise plays, the paused iframe's events are not about the music.
-    if (!player || state.generated) return
+    // While the page plays music, the paused iframe's events are not about it.
+    if (!player || state.local) return
     if (s === YTState.Playing) {
       state.playing = true
       // A pending fade-in starts now; otherwise make sure it is not left at
@@ -325,7 +364,7 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
   }
 
   function onError(code: number) {
-    if (!player || state.generated) return
+    if (!player || state.local) return
     if (classifyError(code) === 'config') return setError('config', code)
     if (source()?.type === SourceType.SourcePlaylist) {
       const total = player.getPlaylist()?.length ?? 0
@@ -341,7 +380,7 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
 
   // The network only matters to YouTube.
   const onOffline = () => {
-    if (!state.generated && (state.created || state.wanted)) setError('offline')
+    if (!state.local && (state.created || state.wanted)) setError('offline')
   }
   const onOnline = () => {
     if (state.error === 'offline') retry()
@@ -349,8 +388,21 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
   target.addEventListener('offline', onOffline)
   target.addEventListener('online', onOnline)
 
+  // A file ended: the next one. A file that can't play counts as broken for
+  // the session, like a dead video.
+  files.on({
+    ended: () => {
+      if (state.local === 'file') advance()
+    },
+    failed: () => {
+      if (state.local !== 'file') return
+      broken.add(state.sourceIndex)
+      advance()
+    },
+  })
+
   function retry() {
-    if (state.generated || state.error === 'no_videos') return // only another genre helps
+    if (state.local || state.error === 'no_videos') return // only another genre (or folder) helps
     clearError()
     if (!state.shown) return // plays once shown again
     if (!player) void ensurePlayer()
@@ -373,7 +425,7 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
       state.muted = cfg.muted
       state.configured = true
       applyVolume()
-      if (state.generated) syncNoise()
+      if (state.local) syncLocal()
       else if (youTubeAudible()) void ensurePlayer()
     },
 
@@ -404,7 +456,7 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
         output(opts.fade ? 0 : targetVolume())
       }
       if (!state.configured) return // configure() starts it
-      if (state.generated) return syncNoise()
+      if (state.local) return syncLocal()
       if (state.shown) playYouTube()
     },
 
@@ -429,13 +481,13 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
     setShown(shown: boolean) {
       if (state.shown === shown) return
       state.shown = shown
-      if (state.generated) return
+      if (state.local) return
       if (!shown) player?.pauseVideo()
       else if (state.wanted) playYouTube()
     },
 
     nextTrack() {
-      if (state.generated) return advance()
+      if (state.local) return advance()
       if (!player || !state.ready || state.error) return
       if (source()?.type === SourceType.SourcePlaylist) player.nextVideo()
       else advance()
@@ -450,8 +502,27 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
       broken = new Set()
       clearError()
       sourceChanged()
-      loadCurrent() // also stops the noise when switching to YouTube
+      loadCurrent() // also stops the page's music when switching to YouTube
       if (!player && youTubeAudible()) void ensurePlayer()
+    },
+
+    /**
+     * Replaces the catalog (the music folder changed, T22). The genre stays
+     * if it is still there; "Мои файлы" starts over, since its numbers may
+     * now mean other files. A genre that is gone gives way to the first one.
+     */
+    setCatalog(c: Catalog) {
+      catalog = c
+      const g = resolveGenre(catalog, state.genreId)
+      if (!g) return
+      if (g.id !== state.genreId) return api.selectGenre(g.id)
+      if (g.id !== LOCAL_GENRE_ID) return
+      broken = new Set()
+      clearError()
+      state.sourceIndex = clampSource(g, state.sourceIndex)
+      stopLocal()
+      sourceChanged()
+      loadCurrent()
     },
 
     /** The genre being played (reactive through state.genreId). */
@@ -504,11 +575,17 @@ export function createMusicPlayer(deps: MusicDeps = {}) {
       target.removeEventListener('offline', onOffline)
       target.removeEventListener('online', onOnline)
       noise.dispose()
+      files.stop()
       player?.destroy()
       player = null
     },
   }
   return api
+}
+
+/** Where Go serves the music folder's file number `id` (services.LocalMusicPath). */
+function fileUrl(id: string) {
+  return `/local-music/${id}`
 }
 
 export type MusicPlayer = ReturnType<typeof createMusicPlayer>

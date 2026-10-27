@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, useTemplateRef } from 'vue'
 import type { MusicPlayer } from '../lib/musicPlayer'
-import NoisePanel from './NoisePanel.vue'
+import LocalPanel from './LocalPanel.vue'
 import PlayerError from './PlayerError.vue'
 import PlayerPlaceholder from './PlayerPlaceholder.vue'
 
@@ -13,18 +13,24 @@ onMounted(() => props.music.attach(host.value!))
 </script>
 
 <!-- The iframe lives in `host` once created and is only hidden (never covered)
-     while an error card or generated noise takes its place (SPEC §2, §3.4);
+     while an error card or music that plays in the page takes its place
+     (SPEC §2, §3.4);
      the music player keeps it paused then. -->
 <template>
   <div class="panel">
     <div
-      v-show="music.state.created && !music.state.error && !music.state.generated"
+      v-show="music.state.created && !music.state.error && !music.state.local"
       ref="host"
       class="host"
     ></div>
-    <NoisePanel
-      v-if="music.state.generated"
+    <LocalPanel
+      v-if="music.state.local && music.state.error !== 'no_files'"
       :title="music.state.title"
+      :note="
+        music.state.local === 'noise'
+          ? 'Звучит прямо из виджета — без YouTube и интернета'
+          : 'Из вашей папки — без YouTube и интернета'
+      "
       :playing="music.state.playing"
     />
     <PlayerError

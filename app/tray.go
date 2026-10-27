@@ -3,13 +3,14 @@ package app
 import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"focuswidget/internal/trayicon"
 	"focuswidget/services"
 )
 
 // buildTray creates the tray icon and menu (docs/SPEC.md §3.5) and hands them
 // to the tray controller, which keeps labels and tooltip up to date.
-// The icon is the exe's own (build/windows/icon.ico), which Wails picks up
-// when none is set.
+// Idle, the icon is the exe's own (build/windows/icon.ico), which Wails picks
+// up when none is set; while a phase runs it shows the time left (T21).
 func buildTray(app *application.App, tray *services.Tray) {
 	menu := application.NewMenu()
 	visibility := menu.Add("Скрыть").OnClick(func(*application.Context) { tray.ToggleVisible() })
@@ -44,3 +45,5 @@ type trayUI struct {
 
 func (u trayUI) SetTooltip(s string) { u.icon.SetTooltip(s) }
 func (u trayUI) UpdateMenu()         { u.menu.Update() }
+
+func (u trayUI) SetRing(r trayicon.Ring) { u.icon.SetIcon(trayicon.PNG(r, trayIconSize())) }

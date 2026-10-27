@@ -17,6 +17,13 @@ const s = props.music.state
 const genre = computed(() => props.music.currentGenre())
 const genres = computed(() => props.music.genres())
 const wanted = computed(() => s.wanted && !s.error)
+const nextLabel = computed(() =>
+  s.local === 'noise'
+    ? 'Следующий звук'
+    : s.local === 'file'
+      ? 'Следующий трек'
+      : 'Следующее видео',
+)
 
 const title = computed(() => {
   if (s.error === 'offline') return 'Ожидание сети'
@@ -171,8 +178,8 @@ function togglePlay() {
       <button
         class="icon-button"
         type="button"
-        :aria-label="s.generated ? 'Следующий звук' : 'Следующее видео'"
-        :disabled="!s.generated && (!s.ready || !!s.error)"
+        :aria-label="nextLabel"
+        :disabled="s.local ? s.error === 'no_files' : !s.ready || !!s.error"
         @click="music.nextTrack()"
       >
         <svg

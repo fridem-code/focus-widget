@@ -216,3 +216,16 @@ func TestDefaultDir(t *testing.T) {
 		t.Fatalf("DefaultDir() = %s, want .../%s", dir, appDirName)
 	}
 }
+
+// T20: files written before pauseOnLock existed get it on.
+func TestLoadFileWithoutPauseOnLockPausesOnLock(t *testing.T) {
+	s := newTestStore(t)
+	writeFile(t, s.Path(), `{"version": 1, "timer": {"focusMin": 30, "autoStartBreaks": false}}`)
+	got, err := s.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Timer.PauseOnLock || got.Timer.FocusMin != 30 || got.Timer.AutoStartBreaks {
+		t.Fatalf("timer = %+v", got.Timer)
+	}
+}

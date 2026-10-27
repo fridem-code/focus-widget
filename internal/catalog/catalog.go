@@ -29,6 +29,10 @@ const (
 	// SourceNoise is noise the app generates itself (T17): no YouTube, no
 	// network. Its id is the kind of noise, one of NoiseKinds.
 	SourceNoise SourceType = "noise"
+	// SourceFile is a file from the user's music folder (T22). It only occurs
+	// in the "Мои файлы" genre the app adds itself; its id is the file's
+	// number in the folder's last scan. genres.json cannot use it.
+	SourceFile SourceType = "file"
 )
 
 type Source struct {
